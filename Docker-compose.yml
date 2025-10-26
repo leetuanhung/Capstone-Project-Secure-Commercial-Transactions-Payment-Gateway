@@ -1,0 +1,14 @@
+version: "3.9"
+
+services:
+  fastapi-backend:
+    build: ./backend
+    container_name: fastapi_backend
+    ports:
+      - "8000:8000"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - AESGCM_SECRET_BASE64=SGVsbG9EYXRhS2V5VGVzdDEyMzQ1Njc4OTAxMjM0NQ==
+    volumes:
+      - ./backend:/app
+    command: uvicorn main:app --host 127.0.0.1 --port 8000 --reload

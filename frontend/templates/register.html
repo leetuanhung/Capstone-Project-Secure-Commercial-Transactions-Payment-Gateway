@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Đăng ký tài khoản</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+        .register-container { 
+            background: #fff; 
+            padding: 40px 32px; 
+            border-radius: 18px; 
+            box-shadow: 0 20px 60px rgba(0,0,0,0.15); 
+            width: 100%; 
+            max-width: 400px;
+        }
+        h2 { 
+            text-align: center; 
+            margin-bottom: 24px; 
+            color: #667eea; 
+            font-weight: 800;
+        }
+        .error-message { 
+            color: #ef4444; 
+            background: #fee2e2; 
+            border-radius: 8px; 
+            padding: 12px; 
+            margin-bottom: 18px; 
+            text-align: center;
+            border-left: 4px solid #ef4444;
+        }
+        .input-group { 
+            margin-bottom: 20px; 
+        }
+        label { 
+            display: block; 
+            margin-bottom: 8px; 
+            color: #334155; 
+            font-weight: 600; 
+        }
+        input { 
+            width: 100%; 
+            padding: 12px; 
+            border: 1.5px solid #e2e8f0; 
+            border-radius: 8px; 
+            font-size: 15px; 
+            box-sizing: border-box;
+        }
+        input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        button { 
+            width: 100%; 
+            padding: 14px; 
+            background: linear-gradient(135deg, #667eea, #764ba2); 
+            color: #fff; 
+            border: none; 
+            border-radius: 8px; 
+            font-size: 16px; 
+            font-weight: 700; 
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+        }
+        .login-link { 
+            margin-top: 24px; 
+            text-align: center; 
+            font-size: 14px; 
+            color: #64748b;
+        }
+        .login-link a { 
+            color: #667eea; 
+            text-decoration: none; 
+            font-weight: 600; 
+        }
+        .login-link a:hover { 
+            text-decoration: underline; 
+        }
+    </style>
+</head>
+<body>
+    <div class="register-container">
+        <h2>Đăng ký tài khoản</h2>
+        
+        {% if error %}
+            <div class="error-message">{{ error }}</div>
+        {% endif %}
+        
+        <!-- QUAN TRỌNG: Sửa form - ĐẶC BIỆT CHÚ Ý DÒNG NÀY -->
+        <form action="http://127.0.0.1:8000/auth/auth/register" method="post">
+            <div class="input-group">
+                <label for="name">Họ tên</label>
+                <input type="text" id="name" name="name" required placeholder="Nhập họ tên đầy đủ">
+            </div>
+            
+            <div class="input-group">
+                <label for="email">Email</label>
+                <input type="email" id="email" name="email" required placeholder="example@email.com">
+            </div>
+            
+            <div class="input-group">
+                <label for="password">Mật khẩu</label>
+                <input type="password" id="password" name="password" required placeholder="Ít nhất 6 ký tự">
+            </div>
+            
+            <div class="input-group">
+                <label for="confirm_password">Nhập lại mật khẩu</label>
+                <input type="password" id="confirm_password" name="confirm_password" required placeholder="Nhập lại mật khẩu">
+            </div>
+            
+            <button type="submit">Đăng ký</button>
+        </form>
+        
+        <div class="login-link">
+            Đã có tài khoản? <a href="http://127.0.0.1:8000">Đăng nhập</a>
+        </div>
+    </div>
+
+    <script>
+        // Thêm JavaScript để kiểm tra mật khẩu trước khi submit
+        document.querySelector('form').addEventListener('submit', function(e) {
+            const password = document.getElementById('password').value;
+            const confirmPassword = document.getElementById('confirm_password').value;
+            
+            if (password.length < 6) {
+                e.preventDefault();
+                alert('Mật khẩu phải có ít nhất 6 ký tự');
+                return;
+            }
+            
+            if (password !== confirmPassword) {
+                e.preventDefault();
+                alert('Mật khẩu không khớp');
+                return;
+            }
+            
+            // Hiển thị loading
+            const button = document.querySelector('button');
+            button.innerHTML = 'Đang xử lý...';
+            button.disabled = true;
+        });
+    </script>
+</body>
+</html>

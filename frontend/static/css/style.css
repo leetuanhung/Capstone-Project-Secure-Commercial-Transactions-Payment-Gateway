@@ -1,0 +1,242 @@
+/*
+==============================================
+|                                            |
+|   GLOBAL STYLESHEET FOR SECURESHOP PROJECT   |
+|   Tác giả: Gemini & [Tên của bạn]             |
+|                                            |
+==============================================
+*/
+
+/* --- 1. CSS Variables (Biến toàn cục) --- */
+/* Dễ dàng thay đổi theme màu sắc của toàn bộ trang web tại đây */
+:root {
+    --font-primary: 'Quicksand', Arial, sans-serif;
+    --color-primary: #2980b9;
+    --color-secondary: #6dd5fa;
+    --color-success: #27ae60;
+    --color-success-dark: #2ecc71;
+    --color-danger: #e74c3c;
+    --color-danger-dark: #c0392b;
+    --color-text-dark: #333;
+    --color-text-light: #555;
+    --color-border: #b2bec3;
+    --background-card: rgba(255, 255, 255, 0.95);
+    --background-input: #f5f6fa;
+    --shadow-main: 0 8px 32px 0 rgba(31, 38, 135, 0.18);
+    --border-radius-main: 20px;
+    --border-radius-small: 8px;
+}
+
+/* --- 2. Base & Reset Styles --- */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    background: linear-gradient(120deg, #74ebd5, #ACB6E5, #ffffff);
+    min-height: 100vh;
+    margin: 0;
+    font-family: var(--font-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+
+/* --- 3. General Components --- */
+.container {
+    background: var(--background-card);
+    padding: 30px 40px;
+    border-radius: var(--border-radius-main);
+    box-shadow: var(--shadow-main);
+    width: 100%;
+    max-width: 450px; /* Default for forms */
+}
+
+h2 {
+    text-align: center;
+    font-weight: 700;
+    font-size: 2.2rem;
+    margin-bottom: 25px;
+    color: var(--color-primary);
+}
+
+.message-box {
+    text-align: center;
+    margin-bottom: 15px;
+    min-height: 20px;
+    font-size: 15px;
+}
+.error-message { color: var(--color-danger); font-weight: 600; }
+.success-message { color: var(--color-success); font-weight: 600; }
+
+/* --- 4. Form Styling (Login, Register, Checkout) --- */
+.form-group {
+    margin-bottom: 18px;
+    position: relative;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
+    color: var(--color-text-dark);
+}
+
+.input-wrapper {
+    display: flex;
+    align-items: center;
+    position: relative;
+}
+
+.input-wrapper .fa-solid {
+    position: absolute;
+    left: 14px;
+    color: var(--color-border);
+    font-size: 1.1rem;
+}
+
+input[type="text"], input[type="password"] {
+    width: 100%;
+    padding: 11px 12px 11px 38px;
+    border: 1.5px solid var(--color-border);
+    border-radius: var(--border-radius-small);
+    background: var(--background-input);
+    font-size: 16px;
+    transition: border 0.2s, box-shadow 0.2s;
+    outline: none;
+    box-sizing: border-box;
+    font-family: var(--font-primary);
+}
+
+input:focus {
+    border-color: var(--color-primary);
+    background: #eaf6fb;
+    box-shadow: 0 0 0 2px rgba(109, 213, 250, 0.2);
+}
+
+/* -- Buttons -- */
+.btn {
+    width: 100%;
+    padding: 13px;
+    color: #fff;
+    border: none;
+    border-radius: var(--border-radius-small);
+    font-size: 18px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-top: 10px;
+    text-decoration: none;
+    display: inline-block;
+    text-align: center;
+}
+
+.btn:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px 0 rgba(0, 0, 0, 0.2);
+}
+
+.btn:disabled {
+    background: #a4b0be;
+    cursor: not-allowed;
+    box-shadow: none;
+}
+
+.btn-login { background: linear-gradient(90deg, #2980b9, #6dd5fa); }
+.btn-register, .btn-pay, .btn-checkout { background: linear-gradient(90deg, var(--color-success), var(--color-success-dark)); }
+.btn-back { background: linear-gradient(90deg, #95a5a6, #7f8c8d); }
+.btn-continue { background: linear-gradient(90deg, #16a085, #1abc9c); }
+
+.bottom-link {
+    margin-top: 18px;
+    text-align: center;
+    font-size: 15px;
+}
+.bottom-link a {
+    text-decoration: none;
+    font-weight: 600;
+    transition: color 0.2s;
+    color: var(--color-primary);
+}
+.register-container .bottom-link a { color: var(--color-success); }
+
+
+/* --- 5. Page-Specific Styles --- */
+
+/* -- Store & Cart -- */
+.wide-container { max-width: 850px; }
+
+.product-card {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 20px;
+    border: 1px solid #dfe6e9;
+    border-radius: 15px;
+    background: #fdfdfd;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+    margin-bottom: 20px;
+}
+.product-info { flex-grow: 1; }
+.product-title { font-size: 1.3rem; font-weight: 700; color: var(--color-text-dark); margin-bottom: 8px; }
+.product-meta { font-size: 0.9rem; color: #7f8c8d; margin-bottom: 10px; }
+.product-price { font-size: 1.5rem; font-weight: 900; color: var(--color-danger); }
+.product-actions { display: flex; flex-direction: column; gap: 10px; }
+.product-actions .btn { padding: 10px 20px; width: auto; }
+
+.cart-summary { text-align: right; margin-top: 20px; }
+
+.cart-table { width: 100%; border-collapse: collapse; }
+.cart-table th, .cart-table td { padding: 15px; text-align: left; border-bottom: 1px solid #dfe6e9; }
+.cart-table th { background: var(--color-primary); color: white; }
+.cart-table tr:hover { background: #ecf0f1; }
+.remove-btn { color: var(--color-danger); font-weight: bold; text-decoration: none; }
+.cart-total { text-align: right; margin-top: 25px; font-size: 1.2rem; font-weight: 600; }
+.cart-total strong { color: var(--color-danger); }
+.cart-actions { text-align: right; margin-top: 30px; display: flex; justify-content: flex-end; gap: 15px;}
+
+/* -- Checkout -- */
+.order-summary { background: #f1f2f6; padding: 15px; border-radius: 10px; border-left: 5px solid var(--color-primary); margin-bottom: 20px; }
+.order-summary p { margin: 8px 0; display: flex; justify-content: space-between; }
+.order-summary strong { color: var(--color-danger); font-size: 1.2rem; }
+#card-element { border: 1.5px solid var(--color-border); border-radius: var(--border-radius-small); padding: 10px 12px; background: var(--background-input); transition: all 0.2s; }
+#card-element.StripeElement--focus { border-color: var(--color-primary); box-shadow: 0 0 0 2px rgba(109, 213, 250, 0.3); }
+
+/* -- Success & Error Pages -- */
+.status-container { text-align: center; max-width: 600px; }
+.status-container .icon { font-size: 5rem; margin-bottom: 20px; }
+.success-container .icon { color: var(--color-success-dark); animation: bounce 1.5s ease-out infinite; }
+.error-container .icon { color: var(--color-danger); }
+.success-container h2 { color: var(--color-success); }
+.error-container h2 { color: var(--color-danger-dark); }
+.detail-box { width: 100%; background: #f7f9fb; border: 1px solid #e0e4e8; border-radius: 10px; padding: 20px; text-align: left; margin-top: 20px; }
+.detail-box p { word-wrap: break-word; }
+.receipt-signature { font-size: 0.8rem; color: #7f8c8d; margin-top: 15px; border-top: 1px dashed #ccc; padding-top: 10px; }
+
+@keyframes bounce { 0%, 20%, 50%, 80%, 100% {transform: translateY(0);} 40% {transform: translateY(-20px);} 60% {transform: translateY(-10px);} }
+
+/* -- Welcome Page (Unique Styles) -- */
+body.welcome {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    overflow: hidden;
+}
+.welcome .card { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); animation: slideUp 0.6s ease-out; max-width: 500px; }
+.welcome h1 { font-size: 28px; color: #2d3748; animation: fadeIn 0.6s ease-out 0.5s backwards; }
+.welcome .username { font-size: 20px; color: #667eea; animation: fadeIn 0.6s ease-out 0.7s backwards; }
+.welcome .message { font-size: 16px; color: #718096; animation: fadeIn 0.6s ease-out 0.9s backwards; }
+.welcome .success-icon { width: 80px; height: 80px; margin: 0 auto 30px; border-radius: 50%; background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); display: flex; align-items: center; justify-content: center; animation: scaleIn 0.5s ease-out 0.3s backwards; }
+.welcome .checkmark { width: 40px; height: 40px; stroke-width: 3; stroke: #fff; }
+.welcome .checkmark-circle { stroke-dasharray: 166; stroke-dashoffset: 166; stroke: #38ef7d; fill: none; animation: stroke 0.6s cubic-bezier(0.65, 0, 0.45, 1) forwards; }
+.welcome .checkmark-check { transform-origin: 50% 50%; stroke-dasharray: 48; stroke-dashoffset: 48; animation: stroke 0.3s cubic-bezier(0.65, 0, 0.45, 1) 0.8s forwards; }
+.welcome .progress-bar { height: 100%; background: linear-gradient(90deg, #667eea, #764ba2); animation: progress 3s linear forwards; }
+.welcome .skip-button { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-decoration: none; border-radius: 25px; padding: 12px 30px; font-weight: 600; display: inline-block; margin-top: 20px; }
+@keyframes slideUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes scaleIn { from { transform: scale(0); } to { transform: scale(1); } }
+@keyframes stroke { 100% { stroke-dashoffset: 0; } }
+@keyframes progress { from { width: 0%; } to { width: 100%; } }
+

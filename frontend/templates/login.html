@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>Đăng nhập - Payment Gateway PoC</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="https://fonts.googleapis.com/css?family=Quicksand:500,700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css"/>
+<style>
+/* ==========================================
+ * MODERN LOGIN DESIGN - PROFESSIONAL STYLE
+ * ========================================== */
+:root {
+  --primary: #667eea;
+  --primary-dark: #5568d3;
+  --secondary: #764ba2;
+  --success: #10b981;
+  --danger: #ef4444;
+  --dark: #1e293b;
+  --gray: #64748b;
+  --light: #f1f5f9;
+  --white: #ffffff;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Animated background effect */
+body::before {
+  content: '';
+  position: absolute;
+  width: 200%;
+  height: 200%;
+  background: 
+    radial-gradient(circle at 20% 50%, rgba(255, 255, 255, 0.1) 0%, transparent 50%),
+    radial-gradient(circle at 80% 80%, rgba(255, 255, 255, 0.1) 0%, transparent 50%);
+  animation: float 20s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%, 100% { transform: translate(0, 0) rotate(0deg); }
+  50% { transform: translate(-20px, -20px) rotate(180deg); }
+}
+
+.login-container {
+  position: relative;
+  z-index: 1;
+  background: var(--white);
+  padding: 50px 40px;
+  border-radius: 24px;
+  box-shadow: 
+    0 20px 60px rgba(0, 0, 0, 0.3),
+    0 0 0 1px rgba(255, 255, 255, 0.1) inset;
+  width: 100%;
+  max-width: 440px;
+  animation: slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(40px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Logo/Icon Section */
+.icon-user {
+  width: 80px;
+  height: 80px;
+  margin: 0 auto 24px;
+  background: linear-gradient(135deg, var(--primary), var(--secondary));
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 40px;
+  color: var(--white);
+  box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
+  animation: scaleIn 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) 0.2s backwards;
+}
+
+@keyframes scaleIn {
+  from {
+    transform: scale(0) rotate(-180deg);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+  }
+}
+
+.login-container h2 {
+  text-align: center;
+  margin-bottom: 12px;
+  color: var(--dark);
+  font-weight: 800;
+  font-size: 28px;
+  letter-spacing: -0.5px;
+}
+
+/* Message Box */
+.message-box {
+  text-align: center;
+  margin-bottom: 24px;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  padding: 12px 16px;
+  animation: slideDown 0.4s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.error-message {
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid var(--danger);
+  font-weight: 500;
+  font-size: 14px;
+}
+
+.success-message {
+  background: #d1fae5;
+  color: #065f46;
+  border: 1px solid var(--success);
+  font-weight: 500;
+  font-size: 14px;
+}
+
+/* Input Groups */
+.input-group {
+  width: 100%;
+  margin-bottom: 20px;
+  animation: fadeIn 0.5s ease-out backwards;
+}
+
+.input-group:nth-child(1) { animation-delay: 0.3s; }
+.input-group:nth-child(2) { animation-delay: 0.4s; }
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.input-group label {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--dark);
+  font-weight: 600;
+  font-size: 14px;
+  text-align: left;
+}
+
+.input-group .input-wrapper {
+  position: relative;
+  display: block;
+}
+
+.input-group .fa-solid {
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--gray);
+  font-size: 18px;
+  transition: color 0.3s;
+  z-index: 1;
+}
+
+.login-container input[type="text"],
+.login-container input[type="password"] {
+  width: 100%;
+  padding: 14px 16px 14px 48px;
+  border: 2px solid #e2e8f0;
+  border-radius: 12px;
+  background: var(--light);
+  font-size: 15px;
+  font-family: 'Inter', sans-serif;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  outline: none;
+}
+
+.login-container input:focus {
+  border-color: var(--primary);
+  background: var(--white);
+  box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+  transform: translateY(-2px);
+}
+
+.login-container input:focus + .fa-solid {
+  color: var(--primary);
+  transform: translateY(-50%) scale(1.1);
+}
+
+/* Submit Button */
+.login-container button {
+  width: 100%;
+  padding: 16px;
+  background: linear-gradient(135deg, var(--primary), var(--secondary));
+  color: var(--white);
+  border: none;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 700;
+  font-family: 'Inter', sans-serif;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  margin-top: 8px;
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+  position: relative;
+  overflow: hidden;
+  animation: fadeIn 0.5s ease-out 0.5s backwards;
+}
+
+.login-container button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+  transition: left 0.5s;
+}
+
+.login-container button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+}
+
+.login-container button:hover::before {
+  left: 100%;
+}
+
+.login-container button:active {
+  transform: translateY(0);
+}
+
+/* Register Link */
+.register-link {
+  margin-top: 24px;
+  text-align: center;
+  font-size: 14px;
+  color: var(--gray);
+  animation: fadeIn 0.5s ease-out 0.6s backwards;
+}
+
+.register-link::before {
+  content: '';
+  display: block;
+  width: 100%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, #e2e8f0, transparent);
+  margin-bottom: 24px;
+}
+
+.register-link a {
+  color: var(--primary);
+  text-decoration: none;
+  font-weight: 600;
+  transition: all 0.3s;
+  position: relative;
+}
+
+.register-link a::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  width: 0;
+  height: 2px;
+  background: var(--primary);
+  transition: width 0.3s;
+}
+
+.register-link a:hover {
+  color: var(--primary-dark);
+}
+
+.register-link a:hover::after {
+  width: 100%;
+}
+
+/* Responsive Design */
+@media (max-width: 480px) {
+  .login-container {
+    padding: 40px 24px;
+    max-width: 100%;
+  }
+  
+  .login-container h2 {
+    font-size: 24px;
+  }
+  
+  .icon-user {
+    width: 64px;
+    height: 64px;
+    font-size: 32px;
+  }
+}
+
+/* Loading State */
+.login-container button.loading {
+  pointer-events: none;
+  opacity: 0.7;
+}
+
+.login-container button.loading::after {
+  content: '';
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+</style>
+
+<script>
+window.onload = function() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const urlMessage = urlParams.get('message');
+  const templateError = document.getElementById('template-error').textContent.trim();
+  const messageContainer = document.querySelector('.message-box');
+
+  if (templateError) {
+    messageContainer.textContent = templateError;
+    messageContainer.classList.add('error-message');
+  } else if (urlMessage) {
+    messageContainer.textContent = urlMessage;
+    messageContainer.classList.add('success-message');
+  }
+};
+</script>
+</head>
+
+<body>
+  <div class="login-container">
+    <div class="icon-user"><i class="fa-solid fa-user-circle"></i></div>
+    <h2>Đăng nhập Hệ thống</h2>
+
+    <p class="message-box"></p>
+
+    <!-- ✅ ĐÃ SỬA ACTION THÀNH /auth/login -->
+    <form action="/auth/auth/login" method="post">
+      <div class="input-group">
+        <label for="username">Tên đăng nhập hoặc Email</label>
+        <div class="input-wrapper">
+          <i class="fa-solid fa-user"></i>
+          <input type="text" id="username" name="username" required>
+        </div>
+      </div>
+
+      <div class="input-group">
+        <label for="password">Mật khẩu</label>
+        <div class="input-wrapper">
+          <i class="fa-solid fa-lock"></i>
+          <input type="password" id="password" name="password" required>
+        </div>
+      </div>
+
+      <button  type="submit">Đăng nhập</button>
+    </form>
+
+    <div class="register-link">
+      Chưa có tài khoản? <a href="/auth/auth/register">Đăng ký</a>
+    </div>
+  </div>
+    <div id="template-error" style="display: none;">{{ error | default("", true) }}</div>
+</body>
+</html>

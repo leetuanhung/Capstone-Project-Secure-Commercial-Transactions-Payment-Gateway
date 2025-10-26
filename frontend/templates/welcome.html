@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- ✅ ĐÃ SỬA THÀNH /order_service/orders -->
+    <meta http-equiv="refresh" content="3;url=/order_service/orders">
+    <title>Đăng nhập thành công - SecureShop</title>
+    
+    <style>
+        /* ==========================================
+         * RESET & BASE STYLES
+         * ========================================== */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* ==========================================
+         * ANIMATED BACKGROUND PARTICLES
+         * ========================================== */
+        .particles {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            z-index: 0;
+        }
+
+        .particle {
+            position: absolute;
+            display: block;
+            pointer-events: none;
+            width: 10px;
+            height: 10px;
+            background: rgba(255, 255, 255, 0.2);
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+            border-radius: 50%;
+            animation: float 15s infinite;
+        }
+
+        .particle:nth-child(1) { left: 10%; animation-delay: 0s; }
+        .particle:nth-child(2) { left: 20%; animation-delay: 2s; }
+        .particle:nth-child(3) { left: 30%; animation-delay: 4s; }
+        .particle:nth-child(4) { left: 40%; animation-delay: 6s; }
+        .particle:nth-child(5) { left: 50%; animation-delay: 8s; }
+        .particle:nth-child(6) { left: 60%; animation-delay: 10s; }
+        .particle:nth-child(7) { left: 70%; animation-delay: 12s; }
+        .particle:nth-child(8) { left: 80%; animation-delay: 14s; }
+
+        @keyframes float {
+            0% {
+                transform: translateY(100vh) scale(0);
+                opacity: 0;
+            }
+            10% {
+                opacity: 1;
+            }
+            90% {
+                opacity: 1;
+            }
+            100% {
+                transform: translateY(-100vh) scale(1);
+                opacity: 0;
+            }
+        }
+
+        /* ==========================================
+         * MAIN CONTAINER
+         * ========================================== */
+        .container {
+            position: relative;
+            z-index: 1;
+            text-align: center;
+            padding: 40px;
+            max-width: 500px;
+            width: 90%;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 50px 40px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            animation: slideUp 0.6s ease-out;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* ==========================================
+         * SUCCESS ICON
+         * ========================================== */
+        .success-icon {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 30px;
+            position: relative;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            animation: scaleIn 0.5s ease-out 0.3s backwards;
+        }
+
+        @keyframes scaleIn {
+            from {
+                transform: scale(0) rotate(-180deg);
+            }
+            to {
+                transform: scale(1) rotate(0deg);
+            }
+        }
+
+        .success-icon::before {
+            content: '';
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            background: inherit;
+            animation: pulse 2s ease-out infinite;
+        }
+
+        @keyframes pulse {
+            0% {
+                transform: scale(1);
+                opacity: 1;
+            }
+            100% {
+                transform: scale(1.5);
+                opacity: 0;
+            }
+        }
+
+        .checkmark {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: block;
+            stroke-width: 3;
+            stroke: #fff;
+            stroke-miterlimit: 10;
+            animation: fill 0.4s ease-in-out 0.4s forwards, scale 0.3s ease-in-out 0.9s both;
+            position: relative;
+            z-index: 1;
+        }
+
+        .checkmark-circle {
+            stroke-dasharray: 166;
+            stroke-dashoffset: 166;
+            stroke-width: 2;
+            stroke-miterlimit: 10;
+            stroke: #38ef7d;
+            fill: none;
+            animation: stroke 0.6s cubic-bezier(0.65, 0, 0.45, 1) forwards;
+        }
+
+        .checkmark-check {
+            transform-origin: 50% 50%;
+            stroke-dasharray: 48;
+            stroke-dashoffset: 48;
+            animation: stroke 0.3s cubic-bezier(0.65, 0, 0.45, 1) 0.8s forwards;
+        }
+
+        @keyframes stroke {
+            100% {
+                stroke-dashoffset: 0;
+            }
+        }
+
+        @keyframes scale {
+            0%, 100% {
+                transform: none;
+            }
+            50% {
+                transform: scale3d(1.1, 1.1, 1);
+            }
+        }
+
+        /* ==========================================
+         * TEXT CONTENT
+         * ========================================== */
+        h1 {
+            font-size: 28px;
+            font-weight: 700;
+            color: #2d3748;
+            margin-bottom: 15px;
+            animation: fadeIn 0.6s ease-out 0.5s backwards;
+        }
+
+        .username {
+            font-size: 20px;
+            font-weight: 600;
+            color: #667eea;
+            margin-bottom: 10px;
+            animation: fadeIn 0.6s ease-out 0.7s backwards;
+        }
+
+        .message {
+            font-size: 16px;
+            color: #718096;
+            line-height: 1.6;
+            margin-bottom: 30px;
+            animation: fadeIn 0.6s ease-out 0.9s backwards;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* ==========================================
+         * LOADING PROGRESS BAR
+         * ========================================== */
+        .progress-container {
+            width: 100%;
+            height: 4px;
+            background: rgba(102, 126, 234, 0.2);
+            border-radius: 10px;
+            overflow: hidden;
+            margin-bottom: 20px;
+            animation: fadeIn 0.6s ease-out 1.1s backwards;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            border-radius: 10px;
+            animation: progress 3s linear forwards;
+            box-shadow: 0 0 10px rgba(102, 126, 234, 0.5);
+        }
+
+        @keyframes progress {
+            from {
+                width: 0%;
+            }
+            to {
+                width: 100%;
+            }
+        }
+
+        /* ==========================================
+         * REDIRECT INFO
+         * ========================================== */
+        .redirect-info {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            font-size: 14px;
+            color: #a0aec0;
+            animation: fadeIn 0.6s ease-out 1.3s backwards;
+        }
+
+        .spinner {
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(102, 126, 234, 0.2);
+            border-top-color: #667eea;
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* ==========================================
+         * SKIP BUTTON
+         * ========================================== */
+        .skip-button {
+            display: inline-block;
+            margin-top: 20px;
+            padding: 12px 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-decoration: none;
+            border-radius: 25px;
+            font-weight: 600;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+            animation: fadeIn 0.6s ease-out 1.5s backwards;
+        }
+
+        .skip-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .skip-button:active {
+            transform: translateY(0);
+        }
+
+        /* ==========================================
+         * RESPONSIVE
+         * ========================================== */
+        @media (max-width: 480px) {
+            .card {
+                padding: 40px 30px;
+            }
+
+            h1 {
+                font-size: 24px;
+            }
+
+            .username {
+                font-size: 18px;
+            }
+
+            .message {
+                font-size: 14px;
+            }
+
+            .success-icon {
+                width: 60px;
+                height: 60px;
+            }
+
+            .checkmark {
+                width: 30px;
+                height: 30px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Animated Background Particles -->
+    <div class="particles">
+        <span class="particle"></span>
+        <span class="particle"></span>
+        <span class="particle"></span>
+        <span class="particle"></span>
+        <span class="particle"></span>
+        <span class="particle"></span>
+        <span class="particle"></span>
+        <span class="particle"></span>
+    </div>
+
+    <!-- Main Container -->
+    <div class="container">
+        <div class="card">
+            <!-- Success Icon with Checkmark Animation -->
+            <div class="success-icon">
+                <svg class="checkmark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 52">
+                    <circle class="checkmark-circle" cx="26" cy="26" r="25" fill="none"/>
+                    <path class="checkmark-check" fill="none" d="M14.1 27.2l7.1 7.2 16.7-16.8"/>
+                </svg>
+            </div>
+
+            <!-- Success Message -->
+            <h1>🎉 Đăng nhập thành công!</h1>
+            
+            <p class="username">Xin chào, <strong>{{ username }}</strong>!</p>
+            
+            <p class="message">
+                Chào mừng bạn đến với <strong>SecureShop</strong>.<br>
+                Bạn đang được chuyển hướng đến trang cửa hàng...
+            </p>
+
+            <!-- Progress Bar -->
+            <div class="progress-container">
+                <div class="progress-bar"></div>
+            </div>
+
+            <!-- Redirect Info -->
+            <div class="redirect-info">
+                <div class="spinner"></div>
+                <span>Đang chuyển hướng trong 3 giây</span>
+            </div>
+
+            <!-- ✅ ĐÃ SỬA LINK THÀNH /store -->
+            <a href="/order_service/orders" class="skip-button">
+                Bỏ qua và đi đến cửa hàng ngay →
+            </a>
+        </div>
+    </div>
+
+    <script>
+        // Preload store page for faster transition
+        const link = document.createElement('link');
+        link.rel = 'prefetch';
+        link.href = '/order_service/orders';
+        document.head.appendChild(link);
+
+        // Add smooth transition when redirecting
+        setTimeout(() => {
+            document.body.style.opacity = '0';
+            document.body.style.transition = 'opacity 0.3s ease-out';
+        }, 2700);
+    </script>
+</body>
+</html>

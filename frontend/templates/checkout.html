@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>Thanh toán an toàn - Hosted Fields</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="https://fonts.googleapis.com/css?family=Quicksand:500,700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css"/>
+<!-- Tải Stripe JS SDK - Cần thiết cho Hosted Fields -->
+<script src="https://js.stripe.com/v3/"></script>
+<style>
+/* ==========================================
+ * MODERN CHECKOUT DESIGN - SECURE PAYMENT
+ * ========================================== */
+:root {
+  --primary: #667eea;
+  --primary-dark: #5568d3;
+  --secondary: #764ba2;
+  --success: #10b981;
+  --danger: #ef4444;
+  --warning: #f59e0b;
+  --dark: #1e293b;
+  --gray: #64748b;
+  --light: #f1f5f9;
+  --white: #ffffff;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 30px 20px;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Animated background with security theme */
+body::before {
+  content: '';
+  position: absolute;
+  width: 200%;
+  height: 200%;
+  background: 
+    radial-gradient(circle at 20% 50%, rgba(255, 255, 255, 0.1) 0%, transparent 50%),
+    radial-gradient(circle at 80% 80%, rgba(255, 255, 255, 0.1) 0%, transparent 50%);
+  animation: float 20s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%, 100% { transform: translate(0, 0) rotate(0deg); }
+  50% { transform: translate(-20px, -20px) rotate(180deg); }
+}
+
+.checkout-container {
+  position: relative;
+  z-index: 1;
+  background: var(--white);
+  padding: 50px 40px;
+  border-radius: 24px;
+  box-shadow: 
+    0 20px 60px rgba(0, 0, 0, 0.3),
+    0 0 0 1px rgba(255, 255, 255, 0.1) inset;
+  width: 100%;
+  max-width: 520px;
+  animation: slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(40px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Header with Security Icon */
+h2 {
+  text-align: center;
+  color: var(--dark);
+  font-weight: 800;
+  font-size: 2rem;
+  margin-bottom: 28px;
+  letter-spacing: -0.5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+h2 i {
+  color: var(--success);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.1); opacity: 0.8; }
+}
+
+/* Order Summary Box */
+.order-summary {
+  background: linear-gradient(135deg, #f1f5f9, #e2e8f0);
+  padding: 24px;
+  border-radius: 16px;
+  border-left: 5px solid var(--primary);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  margin-bottom: 32px;
+  animation: fadeIn 0.5s ease-out 0.2s backwards;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.order-summary p {
+  margin: 10px 0;
+  font-size: 15px;
+  color: var(--dark);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 500;
+}
+
+.order-summary p span {
+  color: var(--gray);
+  font-weight: 600;
+}
+
+.order-summary strong {
+  color: var(--danger);
+  font-size: 1.4rem;
+  font-weight: 800;
+}
+
+/* Form Styling */
+.form-group {
+  margin-bottom: 24px;
+  animation: fadeIn 0.5s ease-out backwards;
+}
+
+.form-group:nth-child(2) { animation-delay: 0.3s; }
+.form-group:nth-child(3) { animation-delay: 0.4s; }
+
+.form-group label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 600;
+  color: var(--dark);
+  font-size: 14px;
+}
+
+/* Card Holder Name Input */
+.form-group input[type="text"] {
+  width: 100%;
+  padding: 14px 16px;
+  border: 2px solid #e2e8f0;
+  border-radius: 12px;
+  background: var(--light);
+  font-size: 15px;
+  font-family: 'Inter', sans-serif;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  outline: none;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.form-group input[type="text"]:focus {
+  border-color: var(--primary);
+  background: var(--white);
+  box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+  transform: translateY(-2px);
+}
+
+.form-group input[type="text"]::placeholder {
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+/* Stripe Hosted Fields Styling */
+#card-element {
+  border: 2px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 14px 16px;
+  background: var(--light);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  min-height: 42px;
+}
+
+#card-element.StripeElement--focus {
+  border-color: var(--primary);
+  background: var(--white);
+  box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+  transform: translateY(-2px);
+}
+
+#card-element.StripeElement--invalid {
+  border-color: var(--danger);
+  box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.1);
+}
+
+#card-element.StripeElement--complete {
+  border-color: var(--success);
+  background: #d1fae5;
+}
+
+/* Error & Loading Messages */
+.payment-errors, .loading-message {
+  margin-top: 16px;
+  margin-bottom: 16px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  text-align: center;
+  font-weight: 600;
+  font-size: 14px;
+  animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.payment-errors {
+  background: #fee2e2;
+  color: #991b1b;
+  border: 2px solid var(--danger);
+}
+
+.loading-message {
+  background: #dbeafe;
+  color: #1e40af;
+  border: 2px solid #3b82f6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.loading-message::before {
+  content: '';
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(30, 64, 175, 0.3);
+  border-top-color: #1e40af;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Pay Button */
+.pay-button {
+  width: 100%;
+  padding: 16px;
+  background: linear-gradient(135deg, var(--success), #059669);
+  color: var(--white);
+  border: none;
+  border-radius: 12px;
+  font-size: 17px;
+  font-weight: 700;
+  font-family: 'Inter', sans-serif;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  margin-top: 24px;
+  box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  animation: fadeIn 0.5s ease-out 0.5s backwards;
+}
+
+.pay-button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+  transition: left 0.5s;
+}
+
+.pay-button:hover:not(:disabled) {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 25px rgba(16, 185, 129, 0.4);
+  background: linear-gradient(135deg, #059669, #047857);
+}
+
+.pay-button:hover:not(:disabled)::before {
+  left: 100%;
+}
+
+.pay-button:active:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.pay-button:disabled {
+  background: linear-gradient(135deg, #94a3b8, #64748b);
+  cursor: not-allowed;
+  opacity: 0.7;
+  box-shadow: none;
+}
+
+.pay-button i {
+  font-size: 18px;
+}
+
+/* Security Badge */
+.checkout-container::after {
+  content: '';
+  display: block;
+  text-align: center;
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px solid #e2e8f0;
+  font-size: 12px;
+  color: var(--gray);
+}
+
+/* Responsive Design */
+@media (max-width: 600px) {
+  body {
+    padding: 20px 10px;
+  }
+  
+  .checkout-container {
+    padding: 32px 24px;
+  }
+  
+  h2 {
+    font-size: 1.6rem;
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .order-summary {
+    padding: 20px;
+  }
+  
+  .order-summary p {
+    font-size: 14px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+  
+  .order-summary strong {
+    font-size: 1.2rem;
+  }
+  
+  .form-group {
+    margin-bottom: 20px;
+  }
+  
+  .pay-button {
+    font-size: 16px;
+    padding: 14px;
+  }
+}
+
+@media (max-width: 400px) {
+  .checkout-container {
+    padding: 24px 16px;
+  }
+  
+  h2 {
+    font-size: 1.4rem;
+  }
+  
+  .order-summary {
+    padding: 16px;
+  }
+}
+
+/* Processing State */
+.pay-button.processing {
+  pointer-events: none;
+}
+
+.pay-button.processing::after {
+  content: '';
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  border: 3px solid rgba(255, 255, 255, 0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+/* Success State Animation */
+@keyframes success {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+  100% { transform: scale(1); }
+}
+
+/* Security Indicators */
+.form-group label::before {
+  content: '🔒 ';
+  margin-right: 4px;
+}
+
+/* Trust badges area */
+.checkout-container > form::after {
+  content: '🔐 Thanh toán được bảo mật bởi Stripe';
+  display: block;
+  text-align: center;
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px solid #e2e8f0;
+  font-size: 13px;
+  color: var(--gray);
+  font-weight: 600;
+}
+</style>
+
+</head>
+<body>
+<div class="checkout-container">
+<h2><i class="fa-solid fa-shield-halved"></i> Thanh Toán An Toàn</h2>
+
+    <div class="order-summary">
+        <p>Mô tả: <span>{{ order.description }}</span></p>
+        <p>Mã đơn hàng: <span>{{ order.id }}</span></p>
+        <p>Tổng cộng: <strong>{{ "{:,.0f}".format(order.amount | int) }} {{ order.currency }}</strong></p>
+    </div>
+
+    <form id="payment-form">
+        <input type="hidden" id="order-id" name="order_id" value="{{ order.id }}">
+        <input type="hidden" id="payment-token-input" name="payment_token">
+        <input type="hidden" id="nonce-input" name="nonce">
+        <input type="hidden" id="device-fingerprint-input" name="device_fingerprint">
+
+        <!-- 1. Hosted Fields Placeholder (PCI Scope Reduction) -->
+        <div class="form-group">
+            <label for="card-holder-name">Tên chủ thẻ</label>
+            <input type="text" id="card-holder-name" placeholder="Ví dụ: NGUYEN VAN A" required 
+                   style="width: 100%; padding: 11px 12px; border: 1.5px solid #b2bec3; border-radius: 8px; background: #f5f6fa; font-size: 16px; box-sizing: border-box; outline: none;">
+        </div>
+
+        <div class="form-group">
+            <label>Thông tin thẻ (Được bảo mật bởi PSP)</label>
+            <!-- Thẻ tín dụng, ngày hết hạn, CVC sẽ được chèn vào đây bởi Stripe -->
+            <div id="card-element">
+                <!-- Hosted Fields (iFrame) sẽ được chèn vào đây -->
+            </div>
+        </div>
+        
+        <div id="payment-errors" class="payment-errors"></div>
+        <div id="loading-message" class="loading-message" style="display: none;">Đang xử lý giao dịch... Vui lòng đợi.</div>
+        
+        <!-- 2. Nút Thanh Toán -->
+        <button id="submit-button" class="pay-button">
+            <i class="fa-solid fa-shield-check"></i> Thanh Toán {{ "{:,.0f}".format(order.amount | int) }} VND
+        </button>
+    </form>
+</div>
+
+<!-- 3. JavaScript Logic for Tokenization & API Call -->
+<script>
+    const STRIPE_PUBLIC_KEY = "{{ stripe_public_key }}";
+    const stripe = Stripe(STRIPE_PUBLIC_KEY);
+    const elements = stripe.elements();
+    
+    // Cấu hình Hosted Fields
+    const cardElement = elements.create('card', {
+        style: {
+            base: {
+                fontSize: '16px',
+                color: '#424770',
+                '::placeholder': {
+                    color: '#aab7c4',
+                },
+            },
+            invalid: {
+                color: '#fa755a',
+                iconColor: '#fa755a'
+            }
+        }
+    });
+    
+    // Chèn Hosted Fields vào DOM
+    cardElement.mount('#card-element');
+    
+    const form = document.getElementById('payment-form');
+    const submitButton = document.getElementById('submit-button');
+    const errorDiv = document.getElementById('payment-errors');
+    const loadingDiv = document.getElementById('loading-message');
+    const cardHolderName = document.getElementById('card-holder-name');
+    
+    form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        
+        submitButton.disabled = true;
+        errorDiv.textContent = '';
+        loadingDiv.style.display = 'block';
+
+        // 1. **Tokenization (Bước quan trọng nhất cho PCI-DSS)**
+        // Gửi thông tin thẻ từ Hosted Fields trực tiếp đến PSP (Stripe)
+        const { token, error } = await stripe.createToken(cardElement, {
+            name: cardHolderName.value,
+        });
+
+        if (error) {
+            // Xử lý lỗi Tokenization (ví dụ: thẻ không hợp lệ)
+            errorDiv.textContent = error.message;
+            submitButton.disabled = false;
+            loadingDiv.style.display = 'none';
+            return;
+        }
+
+        // 2. **Chống Replay Attack & Device Binding (Tuần 7-8)**
+        // Tạo Nonce (số ngẫu nhiên dùng một lần) cho mỗi giao dịch
+        const nonce = crypto.randomUUID(); 
+        document.getElementById('nonce-input').value = nonce;
+        
+        // Giả lập Device Fingerprint (sau này có thể dùng thư viện phức tạp hơn)
+        const deviceFingerprint = btoa(navigator.userAgent);
+        document.getElementById('device-fingerprint-input').value = deviceFingerprint;
+
+
+        // 3. **Gửi Token và Nonce về API Gateway (Backend)**
+        // Backend chỉ nhận Payment Token, không nhận PAN
+        document.getElementById('payment-token-input').value = token.id;
+
+        // Tiến hành gửi Form đến Backend (FastAPI route: /create_payment)
+        const formData = new FormData(form);
+        
+        try {
+            const response = await fetch('/payment_service/create_payment', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (response.ok) {
+                const html = await response.text();
+                document.documentElement.innerHTML = html; // Load trang thành công
+            } else {
+                const errorHtml = await response.text();
+                errorDiv.textContent = 'Giao dịch thất bại: Lỗi từ API Gateway';
+                console.error("API Error:", errorHtml);
+                submitButton.disabled = false;
+                loadingDiv.style.display = 'none';
+            }
+        } catch (err) {
+            errorDiv.textContent = 'Lỗi kết nối mạng hoặc máy chủ.';
+            submitButton.disabled = false;
+            loadingDiv.style.display = 'none';
+        }
+    });
+</script>
+
+</body>
+</html>
