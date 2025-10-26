@@ -1,0 +1,7 @@
+pytest
+pytest-asyncio
+pytest-cov
+moto
+boto3
+cryptography
+pytest-mock
