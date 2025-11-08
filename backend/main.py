@@ -20,9 +20,49 @@ from backend.middleware.request_id import RequestIDMiddleware
 from backend.middleware.rate_limiter import RateLimitMiddleware
 from backend.middleware.hmac_verifier import HMACVerifierMiddleware
 from backend.middleware.cors import setup_cors
+from sqlalchemy import text
 
 load_dotenv()
 models.Base.metadata.create_all(bind=engine)
+
+
+def _ensure_user_security_columns() -> None:
+    """Ensure encrypted columns exist for user registration security."""
+    statements = (
+        "ALTER TABLE IF EXISTS users ADD COLUMN IF NOT EXISTS name_encrypted TEXT",
+        "ALTER TABLE IF EXISTS users ADD COLUMN IF NOT EXISTS email_encrypted TEXT",
+        "ALTER TABLE IF EXISTS users ADD COLUMN IF NOT EXISTS phone_encrypted TEXT",
+    )
+    with engine.begin() as connection:
+        for stmt in statements:
+            connection.execute(text(stmt))
+
+
+_ensure_user_security_columns()
+user.ensure_user_security_setup()
+
+
+def _initialize_security_components() -> None:
+    """Attempt to import and initialize payment/security modules so any
+    environment or dependency problems are discovered at startup.
+
+    This is safe to call multiple times and only prints warnings if parts
+    of the security stack (HSM bindings, extra packages) are missing.
+    """
+    try:
+        # Field encryption, data masking and tokenization are imported for
+        # their module-level initialization (singletons, key loading).
+        from backend.services.payment_service.security import encryption as _enc
+        from backend.services.payment_service.security import tokenization as _tok
+        # hsm_client may warn if PKCS#11 is not available; import to surface
+        # that information early in the startup logs.
+        from backend.services.payment_service.security import hsm_client as _hsm
+        print("Security modules loaded: encryption, tokenization, hsm_client")
+    except Exception as exc:  # pragma: no cover - defensive startup logging
+        print("Warning: some security components failed to initialize:", str(exc))
+
+
+_initialize_security_components()
 
 app = FastAPI()
 

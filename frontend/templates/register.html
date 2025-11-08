@@ -113,6 +113,11 @@
             </div>
             
             <div class="input-group">
+                <label for="phone">Số điện thoại</label>
+                <input type="tel" id="phone" name="phone" required placeholder="Nhập số điện thoại">
+            </div>
+            
+            <div class="input-group">
                 <label for="password">Mật khẩu</label>
                 <input type="password" id="password" name="password" required placeholder="Ít nhất 6 ký tự">
             </div>
@@ -135,6 +140,8 @@
         document.querySelector('form').addEventListener('submit', function(e) {
             const password = document.getElementById('password').value;
             const confirmPassword = document.getElementById('confirm_password').value;
+            const phoneInput = document.getElementById('phone');
+            const phoneDigits = phoneInput.value.replace(/\D/g, '');
             
             if (password.length < 6) {
                 e.preventDefault();
@@ -147,6 +154,14 @@
                 alert('Mật khẩu không khớp');
                 return;
             }
+
+            if (phoneDigits.length < 8 || phoneDigits.length > 15) {
+                e.preventDefault();
+                alert('Số điện thoại phải có từ 8 đến 15 chữ số');
+                return;
+            }
+
+            phoneInput.value = phoneDigits;
             
             // Hiển thị loading
             const button = document.querySelector('button');

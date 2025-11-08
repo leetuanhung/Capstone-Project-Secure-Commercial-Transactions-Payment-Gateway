@@ -204,12 +204,12 @@ class SecurePaymentProcessor:
             except Exception:
                 pass
             
-        except Exception as e:
-            return {
-                'success': False,
-                'error': str(e),
-                'timestamp': datetime.utcnow().isoformat()
-            }
+            except Exception as e:
+                return {
+                    'success': False,
+                    'error': str(e),
+                    'timestamp': datetime.utcnow().isoformat()
+                }
     
     def complete_3ds_payment(self, three_ds_session_id: str,
                             otp_code: str,

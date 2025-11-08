@@ -62,26 +62,23 @@ class FieldEncryption:
         - Rotation key phải cẩn thận (cần decrypt cũ, encrypt mới)
     """
     def __init__(self, master_key: Optional[str] = None):
-        """
-        Khởi tạo FieldEncryption với master key
-        
-        Args:
-            master_key: Key base64-encoded (nếu None, tạo key mới)
-                       Trong production, PHẢI load từ KMS/env secure
-        
-        Ví dụ:
-            # Tự động tạo key mới
-            >>> fe = FieldEncryption()
-            
-            # Dùng key có sẵn từ env
-            >>> fe = FieldEncryption(master_key=os.getenv('ENCRYPTION_KEY'))
-        """
-        if master_key:
-            self.master_key = base64.urlsafe_b64decode(master_key)
-        else:
-            # Tạo key mới (CHỈ dùng cho dev/test)
-            self.master_key = Fernet.generate_key()
-        self.fernet = Fernet(self.master_key)
+            """
+            Nhận FERnet key ở dạng URL-safe base64 (44 ký tự).
+            KHÔNG decode base64 trước khi truyền cho Fernet.
+            """
+            if master_key is None:
+                self.master_key = Fernet.generate_key()
+            else:
+                # Giữ nguyên ở dạng base64-urlsafe; nếu là str thì encode sang bytes
+                self.master_key = master_key.encode() if isinstance(master_key, str) else master_key
+            # (Tuỳ chọn) kiểm tra hợp lệ base64
+            try:
+                base64.urlsafe_b64decode(self.master_key)
+            except Exception as e:
+                raise ValueError("Invalid Fernet key: must be URL-safe base64 (44 chars).") from e
+
+            # Tạo Fernet từ key base64 (bytes)
+            self.fernet = Fernet(self.master_key)
 
     def encrypt_field(self, plaintext: str, context: Optional[Dict] = None) -> str:
         """
@@ -192,8 +189,8 @@ class DataMasking:
         - Hiển thị số điện thoại: "+84***890"
     
     Lưu ý:
-        - Masking KHÔNG phải là mã hóa (không thể unmas
-
+        - Masking KHÔNG phải là mã hóa (không thể unmask để lấy lại bản gốc)
+    """
     @staticmethod
     def mask_card_number(card_number: str, show_last: int = 4) -> str:
         clean = ''.join(filter(str.isdigit, card_number))
@@ -409,3 +406,38 @@ def _wrapped_decrypt_field(self, ciphertext: str, context: Optional[Dict] = None
 FieldEncryption.encrypt_field = _wrapped_encrypt_field
 FieldEncryption.decrypt_field = _wrapped_decrypt_field
 
+if __name__ == "__main__":
+    # Fernet + context
+    print("===== Fernet =====")
+    fe = FieldEncryption()
+    ctx = {"user_id": "1", "field": "email"}
+    c = fe.encrypt_field("user@example.com", ctx)
+    print(c)
+    print(fe.decrypt_field(c, ctx), '\n')
+
+    # Masking
+    print("===== Masking =====")
+    print(DataMasking.mask_card_number("4111 1111 1111 1111"))
+    print(DataMasking.mask_email("user@example.com"))
+    print(DataMasking.mask_phone("+84901234567"), '\n')
+
+    # AES-GCM + AAD
+    print("===== AES-GCM + AAD =====")
+    key = AESEncryption.generate_key()
+    print(key)
+    aad = b"user_id=1"
+    pack = AESEncryption.encrypt_aes_gcm("hello", key, aad)
+    print(pack)
+    print(AESEncryption.decrypt_aes_gcm(pack, key, aad), '\n')
+
+    # PBKDF2
+    print("===== Key Derivation =====")
+    d = KeyDerivation.derive_key_from_password("s3cret!")
+    print(d, KeyDerivation.verify_password_key("s3cret!", d["salt"], d["key"]), '\n')
+
+    # SecureStorage
+    print("===== Secure Storage =====")
+    ss = SecureStorage(AESEncryption.generate_key())
+    blob = ss.store_secure({"card_number":"4111111111111111","name":"Phuc"}, "user-1")
+    print(blob)
+    print(ss.retrieve_secure(blob))

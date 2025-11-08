@@ -1,14 +1,41 @@
 version: "3.9"
 
 services:
-  fastapi-backend:
+  db:
+    image: postgres:15-alpine
+    container_name: nt219_postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
     build: ./backend
-    container_name: fastapi_backend
+    container_name: nt219_backend
     ports:
       - "8000:8000"
+    env_file:
+      - .env
     environment:
+      # Override database host to use Docker service name
+      - database_hostname=db
       - PYTHONUNBUFFERED=1
-      - AESGCM_SECRET_BASE64=SGVsbG9EYXRhS2V5VGVzdDEyMzQ1Njc4OTAxMjM0NQ==
     volumes:
-      - ./backend:/app
-    command: uvicorn main:app --host 127.0.0.1 --port 8000 --reload
+      - ./backend:/app/backend
+      - ./frontend:/app/frontend
+    command: uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  postgres_data:

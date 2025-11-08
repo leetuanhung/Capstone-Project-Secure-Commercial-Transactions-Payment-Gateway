@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, TIMESTAMP, ForeignKey, text
+from sqlalchemy import Column, Integer, String, Float, TIMESTAMP, ForeignKey, text, Text
 from sqlalchemy.orm import relationship
 from backend.database.database import Base
 
@@ -8,7 +8,10 @@ class User(Base):
     name = Column(String, nullable=False)
     email = Column(String, nullable=False, unique=True)
     password = Column(String, nullable=False)
+    name_encrypted = Column(Text, nullable=True)
+    email_encrypted = Column(Text, nullable=True)
     phone = Column(String, nullable=True)
+    phone_encrypted = Column(Text, nullable=True)
     created_at = Column(TIMESTAMP(timezone=True), server_default=text("now()"))
 
     orders = relationship("Order", back_populates="user")

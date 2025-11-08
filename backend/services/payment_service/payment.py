@@ -8,11 +8,16 @@ import os
 import time
 import json
 import traceback
+import hashlib
+import base64
 from backend.config.config import settings
 from backend.services.payment_service.security.hsm_client import (
     sign_data,
     generate_secure_random
 )
+from backend.services.payment_service.security.hsm_client import HSMError
+from backend.services.payment_service.security.tokenization import card_tokenizer
+from backend.services.payment_service.security.encryption import DataMasking
 
 # =========================
 # CẤU HÌNH & KHỞI TẠO
@@ -48,13 +53,17 @@ router = APIRouter(tags=["Payment Service"])
 # HÀM KÝ BIÊN LAI BẰNG HSM
 # =========================
 def create_signed_receipt(transaction_data: dict) -> dict:
-    """Ký biên lai thanh toán bằng khóa RSA trong HSM"""
-    payload = json.dumps(transaction_data).encode()
-    signature = sign_data(payload, key_label="DemoKey")   # 🔐 Ký thật bằng HSM
-    return {
-        "signed_receipt": signature,
-        "signed_by": "HSM-DemoKey"
-    }
+    """Ký biên lai thanh toán bằng HSM nếu có; fallback phần mềm nếu HSM không khả dụng."""
+    payload = json.dumps(transaction_data, sort_keys=True).encode()
+    try:
+        signature = sign_data(payload, key_label="DemoKey")   # 🔐 Ký thật bằng HSM
+        return {"signed_receipt": signature, "signed_by": "HSM-DemoKey"}
+    except (HSMError, Exception):
+        # Fallback an toàn: dùng SHA-256 làm dấu vết + random salt (KHÔNG thay thế chữ ký thật)
+        salt = os.urandom(16)
+        digest = hashlib.sha256(salt + payload).digest()
+        soft_sig = base64.b64encode(digest).decode()
+        return {"signed_receipt": soft_sig, "signed_by": "SOFTWARE-FALLBACK"}
 
 # =========================
 # API ROUTES
@@ -62,6 +71,49 @@ def create_signed_receipt(transaction_data: dict) -> dict:
 @router.get("/healthz")
 async def health_check():
     return {"status": "ok", "service": "payment_service"}
+
+
+# =========================
+# SECURITY APIS (Tokenization demo)
+# =========================
+@router.post("/security/tokenize_card")
+async def tokenize_card(
+    card_number: str = Form(...),
+    cvv: str = Form(...),
+    expiry: str = Form(...),
+    cardholder_name: str = Form(...),
+):
+    """Nhận dữ liệu thẻ và trả về token cùng số thẻ đã che (demo học tập)."""
+    try:
+        result = card_tokenizer.generate_token(card_number, cvv, expiry, cardholder_name)
+        masked = DataMasking.mask_card_number(card_number)
+        return {
+            "token": result["token"],
+            "masked_card": masked,
+            "card_brand": result["card_brand"],
+            "fingerprint": result["fingerprint"],
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/security/token_info")
+async def token_info(token: str):
+    """Trả về thông tin an toàn về token (KHÔNG trả số thẻ gốc)."""
+    try:
+        data = card_tokenizer.detokenize(token)
+        masked = DataMasking.mask_card_number(data["card_number"]) if data else None
+        return {"token": token, "masked_card": masked, "exists": data is not None}
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.post("/security/delete_token")
+async def delete_token(token: str = Form(...)):
+    ok = card_tokenizer.delete_token(token)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Token not found")
+    return {"deleted": True}
 
 @router.get("/checkout", response_class=HTMLResponse)
 async def checkout_single_order(request: Request, order_id: str):
@@ -131,8 +183,11 @@ async def create_payment(request: Request,
         if intent.status == "succeeded":
             order["status"] = "SUCCESS"
 
-            # ✅ Tạo nonce an toàn từ HSM
-            nonce_value = generate_secure_random(12)
+            # ✅ Tạo nonce an toàn từ HSM (fallback phần mềm nếu HSM không khả dụng)
+            try:
+                nonce_value = generate_secure_random(12)
+            except (HSMError, Exception):
+                nonce_value = base64.b64encode(os.urandom(12)).decode()
 
             # ✅ Dữ liệu biên lai cần ký
             receipt_data = {
