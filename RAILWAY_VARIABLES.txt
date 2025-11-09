@@ -1,0 +1,44 @@
+# ============================================
+# RAILWAY ENVIRONMENT VARIABLES
+# ============================================
+# Copy toàn bộ nội dung bên dưới và paste vào Railway Variables (Raw Editor)
+# Railway Dashboard → Your Project → Service → Variables → Raw Editor
+
+# DATABASE (Railway Postgres - dùng reference variables)
+database_hostname=${{Postgres.RAILWAY_PRIVATE_DOMAIN}}
+database_port=5432
+database_password=${{Postgres.PGPASSWORD}}
+database_name=${{Postgres.PGDATABASE}}
+database_username=${{Postgres.PGUSER}}
+
+# JWT AUTHENTICATION (Production keys - đã generate)
+secret_key=09d25e094faa6ca2556c818166b7a9563b93f7099f6f0f4caa6cf63b88e8d3e7
+algorithm=HS256
+access_token_expire_minutes=60
+
+# STRIPE PAYMENT KEYS (Test keys - thay bằng production keys nếu cần)
+Stripe_Public_Key=pk_test_51SC0CKHxKDaqjWchk7Gdngn14fSipxMErC0wxtgOxabZqsh6s9oO6JoisVtw4nsuW7wrnbUuyMSsGtWECKKLIR1400nzMUHPCV
+Stripe_Secret_Key=sk_test_51SC0CKHxKDaqjWchvcG3zkVRWO7a5KjleXgOjfHdupQOYUQZGhIepLHUM098GTizgavcmKmbGj7PCI5CorktGaA400KvCp0Od5
+
+# AES ENCRYPTION KEYS (Production keys - đã generate)
+Key_AES=yAJCYEC/1yTdfgnBlSKXk5F84gyS03LJRSrW20+zLGg=
+USER_AES_KEY=yAJCYEC/1yTdfgnBlSKXk5F84gyS03LJRSrW20+zLGg=
+
+# ============================================
+# HƯỚNG DẪN SỬ DỤNG:
+# ============================================
+# 1. Truy cập Railway Dashboard: https://railway.app/dashboard
+# 2. Click vào project của bạn
+# 3. Click vào service (app container)
+# 4. Click tab "Variables"
+# 5. Click "Raw Editor" (góc trên bên phải)
+# 6. Copy TOÀN BỘ block từ dòng 7 đến dòng 25 (từ database_hostname đến USER_AES_KEY)
+# 7. Paste vào Raw Editor
+# 8. Click "Add" hoặc "Update"
+# 9. Railway sẽ tự động redeploy (đợi 30-60 giây)
+# 10. Check logs để xác nhận không còn lỗi
+#
+# ✅ Khi thành công, logs sẽ hiển thị:
+#    "Starting uvicorn on port 8080..."
+#    "Application startup complete."
+#    "Uvicorn running on http://0.0.0.0:8080"
