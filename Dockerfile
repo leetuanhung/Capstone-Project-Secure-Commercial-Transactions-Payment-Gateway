@@ -16,12 +16,12 @@ RUN pip install --no-cache-dir -r /app/backend/requirements.txt
 COPY backend /app/backend
 COPY frontend /app/frontend
 
-# Copy entrypoint script
-COPY entrypoint.sh /app/entrypoint.sh
-RUN chmod +x /app/entrypoint.sh
+# Copy Python entrypoint script
+COPY entrypoint.py /app/entrypoint.py
+RUN chmod +x /app/entrypoint.py
 
 # Expose port (Railway will inject $PORT env variable)
 EXPOSE 8000
 
-# Use entrypoint script to properly handle PORT variable
-ENTRYPOINT ["/app/entrypoint.sh"]
+# Use Python entrypoint to properly handle PORT variable
+CMD ["python3", "/app/entrypoint.py"]
