@@ -18,6 +18,10 @@ from backend.services.payment_service.security.hsm_client import (
 from backend.services.payment_service.security.hsm_client import HSMError
 from backend.services.payment_service.security.tokenization import card_tokenizer
 from backend.services.payment_service.security.encryption import DataMasking
+from backend.services.payment_service.security.fraud_detection import (
+    FraudDetector,
+    TransactionInput
+)
 
 # =========================
 # CẤU HÌNH & KHỞI TẠO
@@ -48,6 +52,11 @@ except Exception:
 
 TEMP_CART_ORDER: dict[str, dict] = {}
 router = APIRouter(tags=["Payment Service"])
+
+# =========================
+# KHỞI TẠO FRAUD DETECTOR
+# =========================
+fraud_detector = FraudDetector()
 
 # =========================
 # HÀM KÝ BIÊN LAI BẰNG HSM
@@ -167,6 +176,40 @@ async def create_payment(request: Request,
     if not order:
         return templates.TemplateResponse("error.html", {"request": request, "error": "Order not found"})
 
+    # =========================
+    # 🛡️ FRAUD DETECTION CHECK
+    # =========================
+    try:
+        # Lấy thông tin client
+        client_ip = request.client.host if request.client else None
+        
+        # Tạo transaction input để kiểm tra
+        fraud_check = TransactionInput(
+            user_id=order_id,  # Có thể thay bằng user_id thật từ session/JWT
+            amount=float(order["amount"]) / 100 if order["currency"] == "vnd" else float(order["amount"]),  # Convert VND về đơn vị chuẩn
+            currency=order["currency"],
+            ip_address=client_ip,
+            billing_country="VN"  # Có thể lấy từ form hoặc user profile
+        )
+        
+        # Kiểm tra fraud
+        fraud_result = fraud_detector.assess_transaction(fraud_check)
+        
+        # Nếu phát hiện fraud, chặn giao dịch
+        if fraud_result.is_fraud:
+            return templates.TemplateResponse("error.html", {
+                "request": request,
+                "error": f"⚠️ Transaction blocked: {fraud_result.message} (Score: {fraud_result.score:.2f})"
+            })
+    
+    except Exception as e:
+        # Log lỗi nhưng vẫn cho phép giao dịch tiếp tục (fail-open mode)
+        print(f"⚠️ Fraud detection error: {e}")
+        traceback.print_exc()
+
+    # =========================
+    # XỬ LÝ THANH TOÁN VỚI STRIPE
+    # =========================
     try:
         intent = stripe.PaymentIntent.create(
             amount=order["amount"],
