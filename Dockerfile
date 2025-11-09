@@ -19,5 +19,5 @@ COPY frontend /app/frontend
 # Expose port (Railway will inject $PORT env variable)
 EXPOSE 8000
 
-# Run application (Railway provides $PORT)
-CMD uvicorn backend.main:app --host 0.0.0.0 --port ${PORT:-8000}
+# Run application with shell to properly handle PORT variable
+CMD sh -c "uvicorn backend.main:app --host 0.0.0.0 --port ${PORT:-8000}"
