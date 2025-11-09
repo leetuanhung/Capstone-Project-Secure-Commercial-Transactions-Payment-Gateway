@@ -5,15 +5,15 @@ services:
     image: postgres:15-alpine
     container_name: nt219_postgres
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: postgres
+      POSTGRES_USER: ${database_username:-postgres}
+      POSTGRES_PASSWORD: ${database_password:-postgres}
+      POSTGRES_DB: ${database_name:-postgres}
     ports:
-      - "5432:5432"
+      - "${database_port:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U ${database_username:-postgres}"]
       interval: 5s
       timeout: 5s
       retries: 5
