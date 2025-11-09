@@ -6,8 +6,8 @@ Mục đích:
     dữ liệu at-rest (lưu trữ) và in-transit (truyền tải).
 
 Các phương pháp mã hóa:
-    1. Fernet (AES-128 CBC + HMAC) - Đơn giản, an toàn cho hầu hết use cases
-    2. AES-256-GCM - AEAD (Authenticated Encryption with Associated Data)
+    1. AES-256-GCM - AEAD (Authenticated Encryption with Associated Data) - MAIN
+    2. AES-256-GCM - Class AESEncryption (standalone utility)
     3. PBKDF2 - Key derivation từ password
 
 Tại sao cần field-level encryption:
@@ -31,6 +31,7 @@ import base64
 import os
 import secrets
 import hashlib
+import json
 from typing import Dict, Optional
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import hashes
@@ -40,135 +41,209 @@ from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
 
 # =========================
-# FIELD ENCRYPTION (Fernet wrapper - đơn giản và an toàn)
+# FIELD ENCRYPTION (AES-256-GCM - AEAD with native AAD)
 # =========================
 class FieldEncryption:
     """
-    Mã hóa field-level sử dụng Fernet (AES-128-CBC + HMAC-SHA256)
+    Mã hóa field-level sử dụng AES-256-GCM (AEAD)
     
-    Đặc điểm Fernet:
-        ✓ Symmetric encryption (cùng key để encrypt/decrypt)
-        ✓ Tự động thêm timestamp vào ciphertext
-        ✓ Tích hợp HMAC để đảm bảo integrity
-        ✓ Đơn giản, khó dùng sai (misuse-resistant)
+    Đặc điểm AES-GCM:
+        ✓ Authenticated Encryption with Associated Data (AEAD)
+        ✓ Native AAD support (không cần ghép thủ công vào plaintext)
+        ✓ Authentication tag tích hợp (16 bytes)
+        ✓ Nhanh hơn CBC + HMAC (1 operation thay vì 2)
+        ✓ Key size: 256-bit (mạnh hơn Fernet 128-bit)
     
     Thuộc tính:
-        master_key: Key chính (256-bit, base64-encoded)
-        fernet: Instance Fernet để encrypt/decrypt
+        master_key: Key chính (256-bit = 32 bytes)
     
     Lưu ý:
         - Master key PHẢI được bảo vệ nghiêm ngặt (HSM/KMS)
+        - KHÔNG BAO GIỜ reuse nonce với cùng key
         - Nếu mất key, dữ liệu không thể giải mã được
-        - Rotation key phải cẩn thận (cần decrypt cũ, encrypt mới)
+        - AAD phải consistent giữa encrypt và decrypt
     """
     def __init__(self, master_key: Optional[str] = None):
             """
-            Nhận FERnet key ở dạng URL-safe base64 (44 ký tự).
-            KHÔNG decode base64 trước khi truyền cho Fernet.
+            Nhận AES-256 key (32 bytes) ở dạng base64 hoặc tự động tạo.
+            
+            Args:
+                master_key: Base64-encoded 32 bytes key hoặc None để tạo mới
             """
             if master_key is None:
-                self.master_key = Fernet.generate_key()
+                # Tạo key 256-bit mới
+                self.master_key = secrets.token_bytes(32)
             else:
-                # Giữ nguyên ở dạng base64-urlsafe; nếu là str thì encode sang bytes
-                self.master_key = master_key.encode() if isinstance(master_key, str) else master_key
-            # (Tuỳ chọn) kiểm tra hợp lệ base64
-            try:
-                base64.urlsafe_b64decode(self.master_key)
-            except Exception as e:
-                raise ValueError("Invalid Fernet key: must be URL-safe base64 (44 chars).") from e
-
-            # Tạo Fernet từ key base64 (bytes)
-            self.fernet = Fernet(self.master_key)
+                # Decode base64 để lấy raw bytes
+                try:
+                    if isinstance(master_key, str):
+                        self.master_key = base64.b64decode(master_key)
+                    else:
+                        self.master_key = master_key
+                except Exception as e:
+                    raise ValueError("Invalid key: must be base64-encoded 32 bytes") from e
+            
+            # Verify key length (phải đúng 32 bytes cho AES-256)
+            if len(self.master_key) != 32:
+                raise ValueError(f"AES-256 requires 32-byte key, got {len(self.master_key)} bytes")
 
     def encrypt_field(self, plaintext: str, context: Optional[Dict] = None) -> str:
         """
-        Mã hóa một trường dữ liệu với context tùy chọn
+        Mã hóa một trường dữ liệu với AAD (Associated Authenticated Data)
         
-        Context (Associated Data):
-            - Thêm metadata vào ciphertext (nhưng KHÔNG mã hóa metadata)
+        AAD (Associated Data):
+            - Metadata được authenticate nhưng KHÔNG mã hóa
+            - GCM native AAD: không ghép vào plaintext, xử lý riêng
             - Đảm bảo ciphertext chỉ giải mã được với đúng context
-            - Ví dụ context: user_id, record_id, timestamp
+            - Ví dụ AAD: user_id, record_id, field_name
         
         Args:
             plaintext: Dữ liệu cần mã hóa (string)
-            context: Dict metadata (optional, dùng để bind ciphertext với context)
+            context: Dict metadata (optional, dùng làm AAD)
         
         Returns:
-            Ciphertext base64-encoded (string)
+            JSON string chứa: {"ciphertext": "...", "nonce": "...", "tag": "...", "aad": "..."}
         
         Ví dụ:
             >>> fe = FieldEncryption()
             >>> ctx = {"user_id": "123", "field": "email"}
             >>> encrypted = fe.encrypt_field("user@example.com", context=ctx)
             >>> print(encrypted)
-            "gAAAAABl..."  # Base64 ciphertext
+            '{"ciphertext": "Ax3k...", "nonce": "bH7q...", "tag": "9Km...", "aad": "..."}'
         
         Flow:
-            1. Nếu có context, ghép context::plaintext
-            2. Mã hóa bằng Fernet (AES-CBC + HMAC)
-            3. Trả về ciphertext base64
+            1. Tạo nonce ngẫu nhiên 12 bytes (96-bit)
+            2. Chuyển context thành AAD bytes (nếu có)
+            3. Mã hóa bằng AES-256-GCM với AAD
+            4. Trả về JSON chứa ciphertext + nonce + tag + aad
         
         Lưu ý bảo mật:
-            - Context KHÔNG được mã hóa, chỉ dùng để verify integrity
-            - Nếu dùng context khi encrypt, PHẢI dùng context khi decrypt
+            - Nonce PHẢI unique cho mỗi lần encrypt với cùng key
+            - AAD được authenticate nhưng không bị mã hóa
+            - Tag đảm bảo integrity của ciphertext và AAD
         """
         if not plaintext:
             return ""
 
-        # Ghép context vào plaintext (nếu có) để bind chúng lại
-        context_str = str(sorted(context.items())) if context else ""
-        data = f"{context_str}::{plaintext}" if context else plaintext
+        # Chuẩn bị AAD từ context (nếu có)
+        aad_bytes = None
+        aad_str = None
+        if context:
+            # Serialize context thành chuỗi deterministic (sorted)
+            aad_str = str(sorted(context.items()))
+            aad_bytes = aad_str.encode('utf-8')
         
-        # Mã hóa và encode base64
-        encrypted = self.fernet.encrypt(data.encode())
-        return encrypted.decode()
+        # Tạo nonce ngẫu nhiên (12 bytes = 96 bits)
+        nonce = secrets.token_bytes(12)
+        
+        # Mã hóa bằng AES-256-GCM
+        cipher = Cipher(
+            algorithms.AES(self.master_key), 
+            modes.GCM(nonce), 
+            backend=default_backend()
+        )
+        encryptor = cipher.encryptor()
+        
+        # Thêm AAD (nếu có) - AAD không bị mã hóa nhưng được authenticate
+        if aad_bytes:
+            encryptor.authenticate_additional_data(aad_bytes)
+        
+        # Mã hóa plaintext
+        ciphertext = encryptor.update(plaintext.encode('utf-8')) + encryptor.finalize()
+        
+        # Lấy authentication tag (16 bytes)
+        tag = encryptor.tag
+        
+        # Trả về JSON với tất cả thông tin cần thiết
+        result = {
+            'ciphertext': base64.b64encode(ciphertext).decode('utf-8'),
+            'nonce': base64.b64encode(nonce).decode('utf-8'),
+            'tag': base64.b64encode(tag).decode('utf-8'),
+            'aad': aad_str  # Lưu AAD để verify khi decrypt
+        }
+        
+        return json.dumps(result)
 
     def decrypt_field(self, ciphertext: str, context: Optional[Dict] = None) -> str:
         """
-        Giải mã và verify context (nếu có)
+        Giải mã và verify AAD (nếu có)
         
         Args:
-            ciphertext: Ciphertext base64-encoded
-            context: Context đã dùng khi encrypt (PHẢI khớp)
+            ciphertext: JSON string chứa {"ciphertext", "nonce", "tag", "aad"}
+            context: Context phải KHỚP với lúc encrypt
         
         Returns:
             Plaintext (dữ liệu gốc)
         
         Raises:
-            ValueError: Nếu context không khớp (phát hiện tampering)
-            cryptography.fernet.InvalidToken: Nếu ciphertext bị sửa hoặc key sai
+            ValueError: Nếu context không khớp hoặc ciphertext invalid
+            cryptography.exceptions.InvalidTag: Nếu authentication failed (tampering)
         
         Ví dụ:
             >>> decrypted = fe.decrypt_field(encrypted, context=ctx)
             >>> print(decrypted)
             "user@example.com"
             
-            # Nếu context sai → raise ValueError
+            # Nếu context sai → ValueError
             >>> fe.decrypt_field(encrypted, context={"user_id": "456"})
             ValueError: Context mismatch - possible tampering
         
         Flow:
-            1. Giải mã ciphertext bằng Fernet
-            2. Nếu có context, verify context khớp với lúc encrypt
-            3. Trả về plaintext
+            1. Parse JSON để lấy ciphertext, nonce, tag, aad
+            2. Verify context khớp với AAD đã lưu
+            3. Giải mã bằng AES-256-GCM với AAD
+            4. Trả về plaintext
         
         Lưu ý bảo mật:
             - Context mismatch = có thể bị attack (replay, tampering)
-            - Cần log lại mọi lần context mismatch để investigate
+            - InvalidTag = ciphertext hoặc AAD bị sửa đổi
+            - Cần log lại mọi lần decrypt failed để investigate
         """
         if not ciphertext:
             return ""
 
-        decrypted = self.fernet.decrypt(ciphertext.encode()).decode()
+        try:
+            # Parse JSON
+            data = json.loads(ciphertext)
+            ciphertext_bytes = base64.b64decode(data['ciphertext'])
+            nonce = base64.b64decode(data['nonce'])
+            tag = base64.b64decode(data['tag'])
+            stored_aad = data.get('aad')
+        except (json.JSONDecodeError, KeyError, ValueError) as e:
+            raise ValueError(f"Invalid ciphertext format: {e}")
 
+        # Verify context khớp với AAD đã lưu
         if context:
-            context_str = str(sorted(context.items()))
-            prefix = f"{context_str}::"
-            if not decrypted.startswith(prefix):
-                raise ValueError("Context mismatch - possible tampering")
-            return decrypted[len(prefix):]
+            expected_aad = str(sorted(context.items()))
+            if stored_aad != expected_aad:
+                raise ValueError(
+                    f"Context mismatch - possible tampering. "
+                    f"Expected AAD: {expected_aad}, Got: {stored_aad}"
+                )
+        elif stored_aad:
+            raise ValueError("Ciphertext has AAD but no context provided")
 
-        return decrypted
+        # Chuẩn bị AAD bytes
+        aad_bytes = stored_aad.encode('utf-8') if stored_aad else None
+        
+        # Giải mã bằng AES-256-GCM
+        cipher = Cipher(
+            algorithms.AES(self.master_key), 
+            modes.GCM(nonce, tag), 
+            backend=default_backend()
+        )
+        decryptor = cipher.decryptor()
+        
+        # Authenticate AAD (nếu có)
+        if aad_bytes:
+            decryptor.authenticate_additional_data(aad_bytes)
+        
+        # Giải mã và verify tag
+        try:
+            plaintext = decryptor.update(ciphertext_bytes) + decryptor.finalize()
+            return plaintext.decode('utf-8')
+        except Exception as e:
+            raise ValueError(f"Decryption failed - data may be corrupted or tampered: {e}")
 
 
 # =========================
@@ -320,7 +395,9 @@ class SecureStorage:
     """Combine encryption + integrity"""
 
     def __init__(self, encryption_key: bytes):
-        self.encryption = FieldEncryption(base64.urlsafe_b64encode(encryption_key).decode())
+        # FieldEncryption expects base64-encoded string OR raw bytes
+        # Pass base64-encoded string (standard base64, not urlsafe)
+        self.encryption = FieldEncryption(base64.b64encode(encryption_key).decode())
 
     def _is_sensitive(self, key: str) -> bool:
         return key.lower() in ['card_number', 'cvv', 'password', 'pin', 'ssn']
@@ -354,7 +431,8 @@ class SecureStorage:
 # HELPERS
 # =========================
 def generate_master_key() -> str:
-    return Fernet.generate_key().decode()
+    """Tạo AES-256 key (32 bytes) và encode thành base64"""
+    return base64.b64encode(secrets.token_bytes(32)).decode('utf-8')
 
 
 def load_key_from_env() -> Optional[str]:
@@ -407,13 +485,13 @@ FieldEncryption.encrypt_field = _wrapped_encrypt_field
 FieldEncryption.decrypt_field = _wrapped_decrypt_field
 
 if __name__ == "__main__":
-    # Fernet + context
-    print("===== Fernet =====")
+    # AES-256-GCM + AAD
+    print("===== FieldEncryption (AES-256-GCM) =====")
     fe = FieldEncryption()
     ctx = {"user_id": "1", "field": "email"}
     c = fe.encrypt_field("user@example.com", ctx)
-    print(c)
-    print(fe.decrypt_field(c, ctx), '\n')
+    print("Encrypted:", c)
+    print("Decrypted:", fe.decrypt_field(c, ctx), '\n')
 
     # Masking
     print("===== Masking =====")
@@ -421,14 +499,14 @@ if __name__ == "__main__":
     print(DataMasking.mask_email("user@example.com"))
     print(DataMasking.mask_phone("+84901234567"), '\n')
 
-    # AES-GCM + AAD
-    print("===== AES-GCM + AAD =====")
+    # AES-GCM + AAD (standalone utility)
+    print("===== AESEncryption (standalone) =====")
     key = AESEncryption.generate_key()
-    print(key)
+    print("Key:", key)
     aad = b"user_id=1"
     pack = AESEncryption.encrypt_aes_gcm("hello", key, aad)
-    print(pack)
-    print(AESEncryption.decrypt_aes_gcm(pack, key, aad), '\n')
+    print("Encrypted:", pack)
+    print("Decrypted:", AESEncryption.decrypt_aes_gcm(pack, key, aad), '\n')
 
     # PBKDF2
     print("===== Key Derivation =====")
@@ -439,5 +517,5 @@ if __name__ == "__main__":
     print("===== Secure Storage =====")
     ss = SecureStorage(AESEncryption.generate_key())
     blob = ss.store_secure({"card_number":"4111111111111111","name":"Phuc"}, "user-1")
-    print(blob)
-    print(ss.retrieve_secure(blob))
+    print("Stored:", blob)
+    print("Retrieved:", ss.retrieve_secure(blob))
