@@ -320,7 +320,14 @@ h2 {
     <div class="icon-error"><i class="fa-solid fa-circle-xmark"></i></div>
     <h2>Giao dịch Thất bại</h2>
     <p>{{ error }}</p>
-    <a href="/payment_service/checkout_cart" class="back-button">Thử lại</a>
+    <div style="display: flex; gap: 15px; margin-top: 20px; justify-content: center; flex-wrap: wrap;">
+        <a href="/order_service/orders" class="back-button" style="background: var(--primary); border: none;">
+            <i class="fa-solid fa-house"></i> Về trang chủ
+        </a>
+        <a href="/order_service/cart" class="back-button" style="background: var(--gray); border: none;">
+            <i class="fa-solid fa-shopping-cart"></i> Xem giỏ hàng
+        </a>
+    </div>
 </div>
 </body>
 </html>

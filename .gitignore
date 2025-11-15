@@ -2,3 +2,8 @@
 __pycache__/
 *.pyc
 .venv
+
+# TLS certificates (do not commit private keys)
+backend/certs/*.key
+backend/certs/*.crt
+backend/certs/*.pem

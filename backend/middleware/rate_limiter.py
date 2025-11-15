@@ -5,7 +5,7 @@ from fastapi.responses import JSONResponse
 import time
 
 # Giới hạn: 30 requests / 60 giây mỗi IP
-RATE_LIMIT = 30
+RATE_LIMIT = 1
 WINDOW = 60
 cache = {}  # {ip: [timestamps]}
 

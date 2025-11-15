@@ -11,10 +11,10 @@ import datetime
 HIGH_RISK_COUNTRIES: Set[str] = {"KP", "IR", "SY"} 
 
 # Ngưỡng giá trị giao dịch cao
-HIGH_VALUE_THRESHOLD: float = 10000.00
+HIGH_VALUE_THRESHOLD: float = 1000000.00
 
 # Ngưỡng điểm số
-FRAUD_SCORE_THRESHOLD: float = 0.85 # 85%
+FRAUD_SCORE_THRESHOLD: float = 0.75 # 85%
 
 # --- Cấu trúc dữ liệu (Sử dụng Pydantic) ---
 
@@ -131,7 +131,7 @@ class FraudDetector:
             message = "Flagged for high value. Requires review."
 
         # Kiểm tra ngưỡng cuối cùng
-        if not is_fraudulent and final_score > FRAUD_SCORE_THRESHOLD:
+        if not is_fraudulent and final_score >= FRAUD_SCORE_THRESHOLD:
             is_fraudulent = True
             message = f"Blocked due to high fraud score ({final_score:.2f})."
         
