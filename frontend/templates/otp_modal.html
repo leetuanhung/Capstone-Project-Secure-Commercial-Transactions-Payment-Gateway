@@ -1,0 +1,241 @@
+<!-- OTP Modal for Payment Verification -->
+<div id="otpModal" class="modal fade" tabindex="-1" role="dialog" aria-labelledby="otpModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="otpModalLabel">
+                    <i class="fas fa-shield-alt"></i> Xác Thực Thanh Toán
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div id="otpStep1" class="otp-step">
+                    <p class="text-center mb-4">
+                        <i class="fas fa-envelope fa-3x text-primary mb-3"></i><br>
+                        Để đảm bảo an toàn cho giao dịch, chúng tôi sẽ gửi mã OTP đến email của bạn.
+                    </p>
+                    
+                    <div class="form-group">
+                        <label for="userEmail">
+                            <i class="fas fa-at"></i> Email của bạn
+                        </label>
+                        <input type="email" 
+                               class="form-control form-control-lg" 
+                               id="userEmail" 
+                               placeholder="example@gmail.com"
+                               required>
+                        <small class="form-text text-muted">Mã OTP sẽ được gửi đến email này</small>
+                    </div>
+                    
+                    <button type="button" 
+                            class="btn btn-primary btn-lg btn-block" 
+                            id="sendOtpBtn">
+                        <i class="fas fa-paper-plane"></i> Gửi mã OTP
+                    </button>
+                </div>
+                
+                <div id="otpStep2" class="otp-step" style="display: none;">
+                    <div class="alert alert-success" role="alert">
+                        <i class="fas fa-check-circle"></i> 
+                        Mã OTP đã được gửi đến <strong id="sentEmail"></strong>
+                    </div>
+                    
+                    <p class="text-center mb-4">
+                        Vui lòng nhập mã OTP (6 chữ số) bạn nhận được qua email:
+                    </p>
+                    
+                    <div class="form-group">
+                        <label for="otpCode">
+                            <i class="fas fa-key"></i> Mã OTP
+                        </label>
+                        <input type="text" 
+                               class="form-control form-control-lg text-center" 
+                               id="otpCode" 
+                               placeholder="123456"
+                               maxlength="6"
+                               pattern="[0-9]{6}"
+                               style="letter-spacing: 0.5em; font-size: 1.5rem;"
+                               required>
+                        <small class="form-text text-muted">
+                            <i class="fas fa-clock"></i> Mã có hiệu lực trong <span id="otpTimer">5:00</span> phút
+                        </small>
+                    </div>
+                    
+                    <div class="d-flex justify-content-between">
+                        <button type="button" 
+                                class="btn btn-outline-secondary" 
+                                id="resendOtpBtn">
+                            <i class="fas fa-redo"></i> Gửi lại
+                        </button>
+                        <button type="button" 
+                                class="btn btn-success btn-lg" 
+                                id="verifyOtpBtn">
+                            <i class="fas fa-check"></i> Xác nhận & Thanh toán
+                        </button>
+                    </div>
+                </div>
+                
+                <div id="otpLoading" class="text-center" style="display: none;">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="sr-only">Loading...</span>
+                    </div>
+                    <p class="mt-3">Đang xử lý...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .otp-step {
+        min-height: 300px;
+    }
+    
+    #otpCode::-webkit-inner-spin-button,
+    #otpCode::-webkit-outer-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+    }
+    
+    #otpCode[type=number] {
+        -moz-appearance: textfield;
+    }
+</style>
+
+<script>
+// OTP Modal Logic
+let otpTimerInterval = null;
+let currentEmail = '';
+let currentOrderId = '';
+let currentAmount = 0;
+let currentCurrency = 'vnd';
+
+// Show OTP Modal when user clicks Pay button
+function showOTPModal(orderData) {
+    currentOrderId = orderData.id;
+    currentAmount = orderData.amount;
+    currentCurrency = orderData.currency || 'vnd';
+    
+    // Reset modal state
+    document.getElementById('otpStep1').style.display = 'block';
+    document.getElementById('otpStep2').style.display = 'none';
+    document.getElementById('otpLoading').style.display = 'none';
+    document.getElementById('userEmail').value = '';
+    document.getElementById('otpCode').value = '';
+    
+    // Show modal
+    $('#otpModal').modal('show');
+}
+
+// Send OTP
+document.getElementById('sendOtpBtn').addEventListener('click', async function() {
+    const email = document.getElementById('userEmail').value.trim();
+    
+    if (!email || !email.includes('@')) {
+        alert('Vui lòng nhập email hợp lệ');
+        return;
+    }
+    
+    currentEmail = email;
+    
+    // Show loading
+    document.getElementById('otpStep1').style.display = 'none';
+    document.getElementById('otpLoading').style.display = 'block';
+    
+    try {
+        const formData = new FormData();
+        formData.append('email', email);
+        formData.append('order_id', currentOrderId);
+        formData.append('amount', currentAmount);
+        formData.append('currency', currentCurrency);
+        
+        const response = await fetch('/payment_service/request_otp', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            // Show OTP input step
+            document.getElementById('otpLoading').style.display = 'none';
+            document.getElementById('otpStep2').style.display = 'block';
+            document.getElementById('sentEmail').textContent = email;
+            
+            // Start countdown timer
+            startOTPTimer(300); // 5 minutes
+        } else {
+            alert(result.message || 'Không thể gửi OTP. Vui lòng thử lại.');
+            document.getElementById('otpLoading').style.display = 'none';
+            document.getElementById('otpStep1').style.display = 'block';
+        }
+    } catch (error) {
+        console.error('Error sending OTP:', error);
+        alert('Có lỗi xảy ra. Vui lòng thử lại.');
+        document.getElementById('otpLoading').style.display = 'none';
+        document.getElementById('otpStep1').style.display = 'block';
+    }
+});
+
+// Resend OTP
+document.getElementById('resendOtpBtn').addEventListener('click', function() {
+    document.getElementById('otpStep2').style.display = 'none';
+    document.getElementById('otpStep1').style.display = 'block';
+    document.getElementById('userEmail').value = currentEmail;
+    stopOTPTimer();
+});
+
+// Verify OTP and proceed with payment
+document.getElementById('verifyOtpBtn').addEventListener('click', async function() {
+    const otpCode = document.getElementById('otpCode').value.trim();
+    
+    if (!otpCode || otpCode.length !== 6) {
+        alert('Vui lòng nhập mã OTP 6 chữ số');
+        return;
+    }
+    
+    // Store OTP in hidden field or pass to payment form
+    document.getElementById('otpCodeHidden').value = otpCode;
+    document.getElementById('emailHidden').value = currentEmail;
+    
+    // Close modal
+    $('#otpModal').modal('hide');
+    
+    // Trigger actual payment submission
+    submitPaymentWithOTP();
+});
+
+// OTP Timer
+function startOTPTimer(seconds) {
+    let timeLeft = seconds;
+    const timerElement = document.getElementById('otpTimer');
+    
+    otpTimerInterval = setInterval(() => {
+        const minutes = Math.floor(timeLeft / 60);
+        const secs = timeLeft % 60;
+        timerElement.textContent = `${minutes}:${secs.toString().padStart(2, '0')}`;
+        
+        if (timeLeft <= 0) {
+            clearInterval(otpTimerInterval);
+            timerElement.textContent = 'Hết hạn';
+            document.getElementById('verifyOtpBtn').disabled = true;
+        }
+        
+        timeLeft--;
+    }, 1000);
+}
+
+function stopOTPTimer() {
+    if (otpTimerInterval) {
+        clearInterval(otpTimerInterval);
+        otpTimerInterval = null;
+    }
+}
+
+// Auto-format OTP input (only numbers)
+document.getElementById('otpCode').addEventListener('input', function(e) {
+    this.value = this.value.replace(/[^0-9]/g, '');
+});
+</script>

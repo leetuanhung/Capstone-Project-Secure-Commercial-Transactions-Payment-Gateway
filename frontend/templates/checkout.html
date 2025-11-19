@@ -463,6 +463,7 @@ h2 i {
         <input type="hidden" id="payment-token-input" name="payment_token">
         <input type="hidden" id="nonce-input" name="nonce">
         <input type="hidden" id="device-fingerprint-input" name="device_fingerprint">
+        <input type="hidden" id="user-id-input" name="user_id">
 
         <!-- 1. Hosted Fields Placeholder (PCI Scope Reduction) -->
         <div class="form-group">
@@ -515,6 +516,15 @@ h2 i {
     // Chèn Hosted Fields vào DOM
     cardElement.mount('#card-element');
     
+    // Lấy user_id từ localStorage và điền vào form (nếu đã đăng nhập)
+    const userId = localStorage.getItem('user_id');
+    if (userId) {
+        document.getElementById('user-id-input').value = userId;
+        console.log('✅ User ID loaded from localStorage:', userId);
+    } else {
+        console.log('⚠️ No user_id in localStorage - user may not be logged in');
+    }
+    
     const form = document.getElementById('payment-form');
     const submitButton = document.getElementById('submit-button');
     const errorDiv = document.getElementById('payment-errors');
@@ -559,9 +569,17 @@ h2 i {
         // Tiến hành gửi Form đến Backend (FastAPI route: /create_payment)
         const formData = new FormData(form);
         
+        // Lấy JWT token từ localStorage (nếu user đã login)
+        const accessToken = localStorage.getItem('access_token');
+        const headers = {};
+        if (accessToken) {
+            headers['Authorization'] = `Bearer ${accessToken}`;
+        }
+        
         try {
             const response = await fetch('/payment_service/create_payment', {
                 method: 'POST',
+                headers: headers,
                 body: formData
             });
 

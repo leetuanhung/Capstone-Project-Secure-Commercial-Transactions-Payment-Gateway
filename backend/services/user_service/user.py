@@ -234,7 +234,8 @@ async def login_post(
     return templates.TemplateResponse("welcome.html", {
         "request": request,
         "username": display_name,
-        "access_token": access_token
+        "access_token": access_token,
+        "user_id": user_db.id
     })
 
 @router.get("/register", response_class=HTMLResponse)

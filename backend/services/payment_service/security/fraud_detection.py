@@ -3,6 +3,13 @@
 from pydantic import BaseModel, Field
 from typing import List, Set, Optional
 import datetime
+import os
+import joblib
+import math
+
+# DB access for history-based features
+from backend.database.database import SessionLocal
+from backend.models import models as db_models
 
 # --- Hằng số cho các quy tắc ---
 
@@ -53,6 +60,31 @@ class FraudDetector:
         # Ở đây bạn có thể tải mô hình ML đã huấn luyện
         # ví dụ: self.model = joblib.load('fraud_model.pkl')
         self.model = None # Tạm thời
+        self.model_info = None
+
+        # Nếu có đường dẫn model trong biến môi trường, thử load
+        model_path = os.getenv("FRAUD_MODEL_PATH")
+        if model_path:
+            try:
+                # Import class definition trước khi unpickle
+                import sys
+                from pathlib import Path
+                model_dir = Path(model_path).parent
+                if str(model_dir) not in sys.path:
+                    sys.path.insert(0, str(model_dir))
+                
+                # Thử import class (nếu có)
+                try:
+                    from mock_fraud_model_class import MockFraudModel
+                except ImportError:
+                    pass  # Class có thể không cần thiết cho model thật
+                
+                self.model = joblib.load(model_path)
+                self.model_info = {"path": model_path}
+                print(f"Fraud Detector: loaded ML model from {model_path}")
+            except Exception as e:
+                print(f"⚠️ Could not load fraud model '{model_path}': {e}")
+
         print("Fraud Detector initialized.")
 
     def _get_ml_score(self, transaction: TransactionInput) -> float:
@@ -60,24 +92,82 @@ class FraudDetector:
         Hàm (riêng tư) để chấm điểm bằng mô hình ML.
         Đây là phần giữ chỗ (placeholder).
         """
+        # Nếu không có model—trả điểm mặc định
         if not self.model:
-            # Nếu không có mô hình, trả về điểm số trung lập
-            return 0.1 # Giả định điểm số thấp
+            return 0.1
 
-        # --- Khi có mô hình thật ---
-        # 1. Tiền xử lý dữ liệu (feature engineering)
-        # features = self._preprocess_features(transaction)
-        
-        # 2. Dự đoán
-        # (Lưu ý: self.model.predict_proba trả về [prob_class_0, prob_class_1])
-        # score = self.model.predict_proba(features)[0][1] 
-        # return score
-        
-        # Chỉ là ví dụ
-        if transaction.amount > 5000 and transaction.ip_address == "1.2.3.4":
-             return 0.9 # Điểm ML cao
-        
-        return 0.1 # Điểm ML thấp
+        # Nếu model tồn tại, build các features đơn giản từ lịch sử người dùng
+        try:
+            # Nỗ lực lấy lịch sử đơn hàng nếu user_id trông giống số (id user)
+            user_orders = []
+            try:
+                uid = int(transaction.user_id)
+                user_orders = self._get_user_order_history(uid, limit=100)
+                print(f"📊 Found {len(user_orders)} orders for user_id={uid}")
+                if user_orders:
+                    for i, order in enumerate(user_orders[:5]):  # In 5 đơn gần nhất
+                        print(f"   Order {i+1}: id={order.id}, price={order.total_price}, created={order.created_at}")
+            except Exception as e:
+                print(f"⚠️ Could not load order history: {e}")
+                user_orders = []
+
+            # Tính các feature cơ bản
+            amounts = [o.total_price for o in user_orders if o.total_price is not None]
+            now = datetime.datetime.utcnow()
+
+            def count_since(days: int):
+                cutoff = now - datetime.timedelta(days=days)
+                return sum(1 for o in user_orders if o.created_at and o.created_at >= cutoff)
+
+            avg_amount = float(sum(amounts) / len(amounts)) if amounts else 0.0
+            max_amount = float(max(amounts)) if amounts else 0.0
+            std_amount = float(math.sqrt(sum((a - avg_amount) ** 2 for a in amounts) / len(amounts))) if len(amounts) > 1 else 0.0
+            cnt_7d = count_since(7)
+            cnt_30d = count_since(30)
+            last_order_seconds = None
+            if user_orders and user_orders[0].created_at:
+                last_order_seconds = (now - user_orders[0].created_at).total_seconds()
+            last_order_seconds = float(last_order_seconds) if last_order_seconds is not None else 1e9
+
+            # Chuẩn bị feature vector (sắp xếp theo cùng một thứ tự mà model training dùng)
+            features = [
+                float(transaction.amount),
+                avg_amount,
+                max_amount,
+                std_amount,
+                float(cnt_7d),
+                float(cnt_30d),
+                last_order_seconds,
+            ]
+            
+            # Debug log
+            print(f"🔍 ML Features for user {transaction.user_id}:")
+            print(f"   - Current amount: {transaction.amount}")
+            print(f"   - Avg amount: {avg_amount:.2f}")
+            print(f"   - Max amount: {max_amount:.2f}")
+            print(f"   - Count 7d: {cnt_7d}, Count 30d: {cnt_30d}")
+            print(f"   - Last order seconds: {last_order_seconds:.0f}")
+
+            # Chuyển thành dạng phù hợp cho model
+            X = [features]
+
+            # Dự đoán xác suất nếu model hỗ trợ
+            if hasattr(self.model, "predict_proba"):
+                prob = float(self.model.predict_proba(X)[0][1])
+                print(f"🎯 ML Fraud Score: {prob:.2%}")
+                return prob
+            else:
+                pred = self.model.predict(X)
+                # Nếu dự đoán trả về lớp 0/1, map sang 0.5/0.99 để biểu diễn xác suất
+                try:
+                    val = float(pred[0])
+                    return 0.99 if val == 1 else 0.01
+                except Exception:
+                    return 0.1
+
+        except Exception as e:
+            print(f"⚠️ ML scoring error: {e}")
+            return 0.1
 
     def _apply_business_rules(self, transaction: TransactionInput) -> List[str]:
         """
@@ -145,6 +235,25 @@ class FraudDetector:
             triggered_rules=triggered_rules,
             message=message
         )
+
+    def _get_user_order_history(self, user_id: int, limit: int = 100):
+        """
+        Trả về danh sách các Order (đã sắp xếp theo created_at DESC) để feature engineering.
+        """
+        session = SessionLocal()
+        try:
+            orders = (
+                session.query(db_models.Order)
+                .filter(db_models.Order.owner_id == user_id)
+                .order_by(db_models.Order.created_at.desc())
+                .limit(limit)
+                .all()
+            )
+            return orders
+        except Exception:
+            return []
+        finally:
+            session.close()
 
 # --- Cách sử dụng (Ví dụ) ---
 # Bạn sẽ import FraudDetector và TransactionInput vào tệp main
