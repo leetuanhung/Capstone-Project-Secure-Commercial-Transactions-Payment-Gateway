@@ -1,0 +1,1 @@
+{"timestamp": "2025-11-24 02:54:23.639200", "level": "\u001b[32mINFO\u001b[0m", "message": "Payment processing initiated for order", "module": "payment", "function": "create_payment", "line": 190, "order_id": "ORD-B911394B"}

@@ -27,10 +27,11 @@ from backend.utils.logger import (
     get_application_logger,
     log_payment_attempt,
     log_security_event,
-    get_error_logger
+    get_error_logger,
+    get_transaction_logger
 )
 
-logger = get_application_logger(__name__)
+logger = get_transaction_logger(__name__)
 
 # =========================
 # CẤU HÌNH & KHỞI TẠO
@@ -177,13 +178,7 @@ async def create_payment(request: Request,
                          order_id: str = Form(...),
                          nonce: str = Form(...),
                          device_fingerprint: str = Form(...)):
-    logger.info(
-        extra={
-            'order_id': order_id,
-            'amount': order["amount"],
-            'currency': order["currency"]
-        }
-    )
+
     global TEMP_CART_ORDER, CART
 
     order = next((o for o in MOCK_ORDERS if o["id"] == order_id), None)
@@ -192,6 +187,14 @@ async def create_payment(request: Request,
     if not order:
         return templates.TemplateResponse("error.html", {"request": request, "error": "Order not found"})
 
+    logger.info(
+        "Payment processing initiated for order",
+        extra={
+            'order_id': order_id,
+            'amount': order["amount"],
+            'currency': order["currency"],
+        }
+    )
     # =========================
     # 🛡️ FRAUD DETECTION CHECK
     # =========================
