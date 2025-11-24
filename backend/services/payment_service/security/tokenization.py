@@ -27,6 +27,7 @@ import hashlib
 from typing import Dict, Optional
 from datetime import datetime, timedelta
 import re
+from backend.utils.logger import log_audit_trail
 
 class CardTokenizer:
     """
@@ -276,6 +277,12 @@ class CardTokenizer:
         if token in self.token_vault:
             del self.token_vault[token]
             del self.token_expiry[token]
+            log_audit_trail(
+            action='token_deleted',
+            actor_user_id='system',  # Hoặc user_id nếu có
+            target=f'token:{token[:8]}***',
+            details={'reason': 'manual_deletion'}
+        )
             return True
         return False
 

@@ -196,7 +196,7 @@ def get_security_logger(name: str = 'security'):
 
 def get_transaction_logger(name: str = 'transaction'):
     
-    return get_logger(name, file_type='transaction', console = True)
+    return get_logger(name, file_type='transactions', console = True)
 
 def get_audit_logger(name: str = 'audit'):
     

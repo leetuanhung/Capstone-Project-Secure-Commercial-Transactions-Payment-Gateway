@@ -178,8 +178,11 @@ async def create_payment(request: Request,
                          nonce: str = Form(...),
                          device_fingerprint: str = Form(...)):
     logger.info(
-        "Payment request received",
-        extra={'order_id': order_id, 'ip': request.client.host}
+        extra={
+            'order_id': order_id,
+            'amount': order["amount"],
+            'currency': order["currency"]
+        }
     )
     global TEMP_CART_ORDER, CART
 
@@ -251,10 +254,12 @@ async def create_payment(request: Request,
                 transaction_id=intent.id,
                 order_id=order_id,
                 amount=order["amount"]/100,
-                currency='success',
-                status=intent.status,
+                currency=order["currency"],  
+                status="success",         
                 fraud_score=fraud_result.score,
-                masked_card=card_tokenizer
+                ip_address=request.client.host, 
+                device_fingerprint=device_fingerprint,  
+                payment_method="card" 
             )
             order["status"] = "SUCCESS"
 
@@ -297,7 +302,16 @@ async def create_payment(request: Request,
     except stripe.CardError as e:
         body = e.json_body
         err = body.get('error', {})
-        logger.warning(f"Card declined: {err.message}", extra={'order_id':order_id, 'code': err.code})
+        logger.error(
+        "Card declined by Stripe",
+        extra={
+            'order_id': order_id,
+            'error_code': err.get('code'),
+            'error_message': err.get('message'),
+            'decline_code': err.get('decline_code'),
+            'ip_address': request.client.host
+        }
+    )
         return templates.TemplateResponse("error.html", {"request": request, "error": f"Payment failed: {err.get('message')}"})
 
     except stripe.InvalidRequestError as e:
@@ -306,6 +320,13 @@ async def create_payment(request: Request,
         return templates.TemplateResponse("error.html", {"request": request, "error": f"Invalid Data: {e}"})
 
     except Exception as e:
-        traceback.print_exc()
-        logger.error("Critical error in payment processing", exc_info=True, extra={'order_id': order_id})
+        logger.error(
+        "Critical error in payment processing",
+        exc_info=True,
+        extra={
+            'order_id': order_id,
+            'ip_address': request.client.host,
+            'error_type': type(e).__name__
+        }
+    )
         return templates.TemplateResponse("error.html", {"request": request, "error": f"Error processing payment: {e}"})
