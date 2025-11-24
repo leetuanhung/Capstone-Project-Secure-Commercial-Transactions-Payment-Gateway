@@ -168,6 +168,10 @@ async def create_payment(request: Request,
                          order_id: str = Form(...),
                          nonce: str = Form(...),
                          device_fingerprint: str = Form(...)):
+    logger.info(
+        "Payment request received",
+        extra={'order_id': order_id, 'ip': request.client.host}
+    )
     global TEMP_CART_ORDER, CART
 
     order = next((o for o in MOCK_ORDERS if o["id"] == order_id), None)
@@ -242,6 +246,15 @@ async def create_payment(request: Request,
         )
 
         if intent.status == "succeeded":
+            log_payment_attempt(
+                transaction_id=intent.id,
+                order_id=order_id,
+                amount=order["amount"]/100,
+                currency='success',
+                status=intent.status,
+                fraud_score=fraud_result.score,
+                masked_card=card_tokenizer
+            )
             order["status"] = "SUCCESS"
 
             # ✅ Tạo nonce an toàn từ HSM (fallback phần mềm nếu HSM không khả dụng)
@@ -283,6 +296,7 @@ async def create_payment(request: Request,
     except stripe.CardError as e:
         body = e.json_body
         err = body.get('error', {})
+        logger.warning(f"Card declined: {err.message}", extra={'order_id':order_id, 'code': err.code})
         return templates.TemplateResponse("error.html", {"request": request, "error": f"Payment failed: {err.get('message')}"})
 
     except stripe.InvalidRequestError as e:
@@ -292,4 +306,5 @@ async def create_payment(request: Request,
 
     except Exception as e:
         traceback.print_exc()
+        logger.error("Critical error in payment processing", exc_info=True, extra={'order_id': order_id})
         return templates.TemplateResponse("error.html", {"request": request, "error": f"Error processing payment: {e}"})
