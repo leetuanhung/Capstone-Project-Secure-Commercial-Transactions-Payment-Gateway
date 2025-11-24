@@ -21,6 +21,24 @@ from backend.middleware.rate_limiter import RateLimitMiddleware
 from backend.middleware.hmac_verifier import HMACVerifierMiddleware
 from backend.middleware.cors import setup_cors
 from sqlalchemy import text
+import logging
+
+from backend.utils.logger import (
+    init_logging,
+    get_application_logger,
+    log_security_event,
+    log_payment_attempt
+)
+
+# Initialize logging khi app start
+init_logging()
+
+# Get logger
+logger = get_application_logger(__name__)
+
+# Log khi app khởi động
+logger.info("🚀 Payment System starting...")
+logger.info(f"Environment: {os.getenv('ENVIRONMENT', 'development')}")
 
 load_dotenv()
 models.Base.metadata.create_all(bind=engine)
@@ -73,6 +91,7 @@ app.add_middleware(RateLimitMiddleware)
 app.add_middleware(HMACVerifierMiddleware)
 
 # Include routers
+
 app.include_router(user.router, prefix="/auth")
 app.include_router(payment.router, prefix="/payment")
 # Also expose payment service under /payment_service for templates referencing that path

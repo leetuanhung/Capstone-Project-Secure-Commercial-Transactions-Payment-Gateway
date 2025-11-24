@@ -23,6 +23,15 @@ from backend.services.payment_service.security.fraud_detection import (
     TransactionInput
 )
 
+from backend.utils.logger import (
+    get_application_logger,
+    log_payment_attempt,
+    log_security_event,
+    get_error_logger
+)
+
+logger = get_application_logger(__name__)
+
 # =========================
 # CẤU HÌNH & KHỞI TẠO
 # =========================
@@ -168,6 +177,10 @@ async def create_payment(request: Request,
                          order_id: str = Form(...),
                          nonce: str = Form(...),
                          device_fingerprint: str = Form(...)):
+    logger.info(
+        "Payment request received",
+        extra={'order_id': order_id, 'ip': request.client.host}
+    )
     global TEMP_CART_ORDER, CART
 
     order = next((o for o in MOCK_ORDERS if o["id"] == order_id), None)
@@ -197,6 +210,16 @@ async def create_payment(request: Request,
         
         # Nếu phát hiện fraud, chặn giao dịch
         if fraud_result.is_fraud:
+            log_security_event(
+                event_type='fraud_blocked',
+                severity='critical',
+                user_id=order_id,
+                ip_address=request.client.host,
+                details={
+                    'fraud_score': fraud_result.score,
+                    'rules': fraud_result.triggered_rules
+                }
+            )
             return templates.TemplateResponse("error.html", {
                 "request": request,
                 "error": f"⚠️ Transaction blocked: {fraud_result.message} (Score: {fraud_result.score:.2f})"
@@ -224,6 +247,15 @@ async def create_payment(request: Request,
         )
 
         if intent.status == "succeeded":
+            log_payment_attempt(
+                transaction_id=intent.id,
+                order_id=order_id,
+                amount=order["amount"]/100,
+                currency='success',
+                status=intent.status,
+                fraud_score=fraud_result.score,
+                masked_card=card_tokenizer
+            )
             order["status"] = "SUCCESS"
 
             # ✅ Tạo nonce an toàn từ HSM (fallback phần mềm nếu HSM không khả dụng)
@@ -254,16 +286,26 @@ async def create_payment(request: Request,
             })
 
         else:
+            
+            logger.warning(f"Payment incomplete: {intent.status}", extra={'order id': order_id})
+
             return templates.TemplateResponse(
                 "error.html",
                 {"request": request, "error": f"Payment requires confirmation. Status: {intent.status}"}
-            )
+            )            
 
-    except stripe.error.CardError as e:
+    except stripe.CardError as e:
         body = e.json_body
         err = body.get('error', {})
+        logger.warning(f"Card declined: {err.message}", extra={'order_id':order_id, 'code': err.code})
         return templates.TemplateResponse("error.html", {"request": request, "error": f"Payment failed: {err.get('message')}"})
+
+    except stripe.InvalidRequestError as e:
+        # Ghi log lỗi request (như lỗi URL vừa rồi) vào file errors.log
+        logger.error(f"Stripe Invalid Request: {e}", exc_info=True, extra={'order_id': order_id})
+        return templates.TemplateResponse("error.html", {"request": request, "error": f"Invalid Data: {e}"})
 
     except Exception as e:
         traceback.print_exc()
+        logger.error("Critical error in payment processing", exc_info=True, extra={'order_id': order_id})
         return templates.TemplateResponse("error.html", {"request": request, "error": f"Error processing payment: {e}"})

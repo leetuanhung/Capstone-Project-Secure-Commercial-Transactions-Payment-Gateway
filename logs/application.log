@@ -1,0 +1,53 @@
+{"timestamp": "2025-11-23 17:57:34.063651", "level": "\u001b[32mINFO\u001b[0m", "message": "🚀 Payment System starting...", "module": "main", "function": "<module>", "line": 40}
+{"timestamp": "2025-11-23 17:57:34.063651", "level": "\u001b[32mINFO\u001b[0m", "message": "Environment: development", "module": "main", "function": "<module>", "line": 41}
+{"timestamp": "2025-11-23 17:57:38.643347", "level": "\u001b[32mINFO\u001b[0m", "message": "🚀 Payment System starting...", "module": "main", "function": "<module>", "line": 40}
+{"timestamp": "2025-11-23 17:57:38.643347", "level": "\u001b[32mINFO\u001b[0m", "message": "Environment: development", "module": "main", "function": "<module>", "line": 41}
+{"timestamp": "2025-11-23 17:58:19.006324", "level": "\u001b[32mINFO\u001b[0m", "message": "Payment request received", "module": "payment", "function": "create_payment", "line": 180, "order_id": "ORD-4A412169"}
+{"timestamp": "2025-11-23 17:58:20.334263", "level": "\u001b[32mINFO\u001b[0m", "message": "Payment succeeded", "module": "logger", "function": "log_payment_attempt", "line": 230, "transaction_id": "pi_3SWhYFHxKDaqjWch1tz7WZBn", "order_id": "ORD-4A412169"}
+{"timestamp": "2025-11-24 01:47:07.877313", "level": "\u001b[32mINFO\u001b[0m", "message": "🚀 Payment System starting...", "module": "main", "function": "<module>", "line": 40}
+{"timestamp": "2025-11-24 01:47:07.878326", "level": "\u001b[32mINFO\u001b[0m", "message": "Environment: development", "module": "main", "function": "<module>", "line": 41}
+{"timestamp": "2025-11-24 01:48:00.382315", "level": "\u001b[32mINFO\u001b[0m", "message": "Payment request received", "module": "payment", "function": "create_payment", "line": 180, "order_id": "ORD-FF19D809"}
+{"timestamp": "2025-11-24 01:48:02.481655", "level": "\u001b[32mINFO\u001b[0m", "message": "Payment succeeded", "module": "logger", "function": "log_payment_attempt", "line": 234, "transaction_id": "pi_3SWosnHxKDaqjWch0buV98uI", "order_id": "ORD-FF19D809"}
+{"timestamp": "2025-11-24 01:49:47.150614", "level": "\u001b[32mINFO\u001b[0m", "message": "🚀 Payment System starting...", "module": "main", "function": "<module>", "line": 40}
+{"timestamp": "2025-11-24 01:49:47.150614", "level": "\u001b[32mINFO\u001b[0m", "message": "Environment: development", "module": "main", "function": "<module>", "line": 41}
+{"timestamp": "2025-11-24 01:49:58.010855", "level": "\u001b[32mINFO\u001b[0m", "message": "🚀 Payment System starting...", "module": "main", "function": "<module>", "line": 40}
+{"timestamp": "2025-11-24 01:49:58.012504", "level": "\u001b[32mINFO\u001b[0m", "message": "Environment: development", "module": "main", "function": "<module>", "line": 41}
+{"timestamp": "2025-11-24 01:50:04.310487", "level": "\u001b[32mINFO\u001b[0m", "message": "🚀 Payment System starting...", "module": "main", "function": "<module>", "line": 40}
+{"timestamp": "2025-11-24 01:50:04.312009", "level": "\u001b[32mINFO\u001b[0m", "message": "Environment: development", "module": "main", "function": "<module>", "line": 41}
+{"timestamp": "2025-11-24 01:50:10.773074", "level": "\u001b[32mINFO\u001b[0m", "message": "🚀 Payment System starting...", "module": "main", "function": "<module>", "line": 40}
+{"timestamp": "2025-11-24 01:50:10.773074", "level": "\u001b[32mINFO\u001b[0m", "message": "Environment: development", "module": "main", "function": "<module>", "line": 41}
+{"timestamp": "2025-11-24 01:50:25.105434", "level": "\u001b[32mINFO\u001b[0m", "message": "🚀 Payment System starting...", "module": "main", "function": "<module>", "line": 40}
+{"timestamp": "2025-11-24 01:50:25.105434", "level": "\u001b[32mINFO\u001b[0m", "message": "Environment: development", "module": "main", "function": "<module>", "line": 41}
+{"timestamp": "2025-11-24 01:50:31.915218", "level": "\u001b[32mINFO\u001b[0m", "message": "🚀 Payment System starting...", "module": "main", "function": "<module>", "line": 40}
+{"timestamp": "2025-11-24 01:50:31.917561", "level": "\u001b[32mINFO\u001b[0m", "message": "Environment: development", "module": "main", "function": "<module>", "line": 41}
+{"timestamp": "2025-11-24 01:50:38.930756", "level": "\u001b[32mINFO\u001b[0m", "message": "🚀 Payment System starting...", "module": "main", "function": "<module>", "line": 40}
+{"timestamp": "2025-11-24 01:50:38.932267", "level": "\u001b[32mINFO\u001b[0m", "message": "Environment: development", "module": "main", "function": "<module>", "line": 41}
+{"timestamp": "2025-11-24 01:50:51.493090", "level": "\u001b[32mINFO\u001b[0m", "message": "🚀 Payment System starting...", "module": "main", "function": "<module>", "line": 40}
+{"timestamp": "2025-11-24 01:50:51.493090", "level": "\u001b[32mINFO\u001b[0m", "message": "Environment: development", "module": "main", "function": "<module>", "line": 41}
+{"timestamp": "2025-11-24 01:50:58.356529", "level": "\u001b[32mINFO\u001b[0m", "message": "🚀 Payment System starting...", "module": "main", "function": "<module>", "line": 40}
+{"timestamp": "2025-11-24 01:50:58.356529", "level": "\u001b[32mINFO\u001b[0m", "message": "Environment: development", "module": "main", "function": "<module>", "line": 41}
+{"timestamp": "2025-11-24 01:51:04.832082", "level": "\u001b[32mINFO\u001b[0m", "message": "🚀 Payment System starting...", "module": "main", "function": "<module>", "line": 40}
+{"timestamp": "2025-11-24 01:51:04.832082", "level": "\u001b[32mINFO\u001b[0m", "message": "Environment: development", "module": "main", "function": "<module>", "line": 41}
+{"timestamp": "2025-11-24 01:51:20.074327", "level": "\u001b[32mINFO\u001b[0m", "message": "🚀 Payment System starting...", "module": "main", "function": "<module>", "line": 40}
+{"timestamp": "2025-11-24 01:51:20.074327", "level": "\u001b[32mINFO\u001b[0m", "message": "Environment: development", "module": "main", "function": "<module>", "line": 41}
+{"timestamp": "2025-11-24 01:51:27.274497", "level": "\u001b[32mINFO\u001b[0m", "message": "🚀 Payment System starting...", "module": "main", "function": "<module>", "line": 40}
+{"timestamp": "2025-11-24 01:51:27.282562", "level": "\u001b[32mINFO\u001b[0m", "message": "Environment: development", "module": "main", "function": "<module>", "line": 41}
+{"timestamp": "2025-11-24 01:51:33.300485", "level": "\u001b[32mINFO\u001b[0m", "message": "🚀 Payment System starting...", "module": "main", "function": "<module>", "line": 40}
+{"timestamp": "2025-11-24 01:51:33.300485", "level": "\u001b[32mINFO\u001b[0m", "message": "Environment: development", "module": "main", "function": "<module>", "line": 41}
+{"timestamp": "2025-11-24 01:51:39.712975", "level": "\u001b[32mINFO\u001b[0m", "message": "🚀 Payment System starting...", "module": "main", "function": "<module>", "line": 40}
+{"timestamp": "2025-11-24 01:51:39.712975", "level": "\u001b[32mINFO\u001b[0m", "message": "Environment: development", "module": "main", "function": "<module>", "line": 41}
+{"timestamp": "2025-11-24 01:51:45.991786", "level": "\u001b[32mINFO\u001b[0m", "message": "🚀 Payment System starting...", "module": "main", "function": "<module>", "line": 40}
+{"timestamp": "2025-11-24 01:51:45.991786", "level": "\u001b[32mINFO\u001b[0m", "message": "Environment: development", "module": "main", "function": "<module>", "line": 41}
+{"timestamp": "2025-11-24 01:51:52.201968", "level": "\u001b[32mINFO\u001b[0m", "message": "🚀 Payment System starting...", "module": "main", "function": "<module>", "line": 40}
+{"timestamp": "2025-11-24 01:51:52.201968", "level": "\u001b[32mINFO\u001b[0m", "message": "Environment: development", "module": "main", "function": "<module>", "line": 41}
+{"timestamp": "2025-11-24 02:06:50.043721", "level": "\u001b[32mINFO\u001b[0m", "message": "🚀 Payment System starting...", "module": "main", "function": "<module>", "line": 40}
+{"timestamp": "2025-11-24 02:06:50.046451", "level": "\u001b[32mINFO\u001b[0m", "message": "Environment: development", "module": "main", "function": "<module>", "line": 41}
+{"timestamp": "2025-11-24 02:06:59.562550", "level": "\u001b[32mINFO\u001b[0m", "message": "Orders page accessed", "module": "order", "function": "list_orders", "line": 71}
+{"timestamp": "2025-11-24 02:07:02.642601", "level": "\u001b[32mINFO\u001b[0m", "message": "Orders page accessed", "module": "order", "function": "list_orders", "line": 71}
+{"timestamp": "2025-11-24 02:07:22.765757", "level": "\u001b[32mINFO\u001b[0m", "message": "Payment request received", "module": "payment", "function": "create_payment", "line": 180, "order_id": "ORD-3DFF4FBD"}
+{"timestamp": "2025-11-24 02:07:24.285729", "level": "\u001b[32mINFO\u001b[0m", "message": "Payment succeeded", "module": "logger", "function": "log_payment_attempt", "line": 234, "transaction_id": "pi_3SWpBXHxKDaqjWch0k4GFTYZ", "order_id": "ORD-3DFF4FBD"}
+{"timestamp": "2025-11-24 02:08:51.533418", "level": "\u001b[32mINFO\u001b[0m", "message": "🚀 Payment System starting...", "module": "main", "function": "<module>", "line": 40}
+{"timestamp": "2025-11-24 02:08:51.534641", "level": "\u001b[32mINFO\u001b[0m", "message": "Environment: development", "module": "main", "function": "<module>", "line": 41}
+{"timestamp": "2025-11-24 02:09:02.593046", "level": "\u001b[32mINFO\u001b[0m", "message": "Orders page accessed", "module": "order", "function": "list_orders", "line": 71}
+{"timestamp": "2025-11-24 02:09:27.589634", "level": "\u001b[32mINFO\u001b[0m", "message": "Payment request received", "module": "payment", "function": "create_payment", "line": 180, "order_id": "ORD-AE71A8D0"}
+{"timestamp": "2025-11-24 02:09:28.876412", "level": "\u001b[32mINFO\u001b[0m", "message": "Payment succeeded", "module": "logger", "function": "log_payment_attempt", "line": 234, "transaction_id": "pi_3SWpDYHxKDaqjWch1drMV3hB", "order_id": "ORD-AE71A8D0"}

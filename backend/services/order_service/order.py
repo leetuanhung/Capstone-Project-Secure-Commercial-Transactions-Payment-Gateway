@@ -9,11 +9,11 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from pathlib import Path
 import secrets
-
+from backend.utils.logger import get_application_logger
 # -- KHỞI TẠO --
 app = FastAPI(title="order Service")
 router = APIRouter()
-
+logger = get_application_logger(__name__)
 # Fix đường dẫn templates
 BASE_DIR = Path(__file__).resolve().parent.parent.parent.parent
 template = Jinja2Templates(directory=str(BASE_DIR / "frontend" / "templates"))
@@ -68,11 +68,18 @@ CART = []
 
 @router.get("/orders", response_class=HTMLResponse)
 async def list_orders(request: Request):
+    logger.info(
+        "Orders page accessed",
+        extra={"ip": request.client.host}
+    )
     return template.TemplateResponse("orders.html", {"request": request, "orders": MOCK_ORDERS, "cart": CART})
 
 
 @router.get("/add_to_cart", tags=["Cart"])
 async def add_to_cart(order_id: str):
+    
+    logger.info(f"Item added to card: {order_id}")
+    
     order = next((o for o in MOCK_ORDERS if o["id"] == order_id), None)
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")

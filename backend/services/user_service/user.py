@@ -13,9 +13,19 @@ from sqlalchemy.orm import Session
 
 from backend.database.database import get_db, SessionLocal
 from backend.models.models import User
+from backend.schemas import user
 from backend.utils import crypto
 from backend.oauth2 import oauth2
 from backend.services.payment_service.security.encryption import AESEncryption
+import logging
+
+from backend.utils.logger import(
+    get_security_logger,
+    log_security_event,
+    log_audit_trail
+)
+
+logger = get_security_logger()
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -206,6 +216,10 @@ async def login_post(
     db: Session = Depends(get_db)
 ):
     try:
+        logger.info(
+            'Login attempt',
+            extra = {'username': username, 'ip': request.client.host}
+        )
         user_db = _get_user_by_identifier(username, db)
     except RuntimeError as exc:
         db.rollback()
@@ -215,6 +229,14 @@ async def login_post(
         })
 
     if not user_db:
+        
+        log_security_event(
+            event_type = 'login_failed',
+            severity = 'warning',
+            user_id = None,
+            ip_address=request.client.host,
+            details={'username': username, 'reason': 'user_not_found'}
+        )
         return templates.TemplateResponse("login.html", {
             "request": request,
             "error": "Thông tin đăng nhập không đúng"
@@ -223,6 +245,15 @@ async def login_post(
     is_valid = crypto.verify(password, user_db.password)
 
     if not is_valid:
+        
+        log_security_event(
+            event_type = 'login_failed',
+            severity='warning',
+            user_id=user_db.id,
+            ip_address=request.client.host,
+            details={'reason': 'invalid_password'}
+        )
+        
         return templates.TemplateResponse("login.html", {
             "request": request,
             "error": "Email hoặc mật khẩu không đúng"
@@ -230,6 +261,15 @@ async def login_post(
 
     display_name = _decrypt_value(user_db.name_encrypted, _name_aad(user_db.name)) or _normalize(username)
     access_token = oauth2.create_access_token(data={"user_id": user_db.id})
+
+    log_security_event(
+        event_type='login_success',
+        severity='info',
+        user_id = user_db.id,
+        ip_address=request.client.host,
+        details={'username': username}
+    )
+    logger.info(f"User {user_db.id} logged in successfully")
 
     return templates.TemplateResponse("welcome.html", {
         "request": request,
