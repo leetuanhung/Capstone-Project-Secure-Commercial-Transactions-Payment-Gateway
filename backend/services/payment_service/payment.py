@@ -23,16 +23,6 @@ from backend.services.payment_service.security.fraud_detection import (
     TransactionInput
 )
 
-from backend.utils.logger import (
-    get_application_logger,
-    log_payment_attempt,
-    log_security_event,
-    get_error_logger,
-    get_transaction_logger
-)
-
-logger = get_transaction_logger(__name__)
-
 # =========================
 # CẤU HÌNH & KHỞI TẠO
 # =========================
@@ -178,7 +168,6 @@ async def create_payment(request: Request,
                          order_id: str = Form(...),
                          nonce: str = Form(...),
                          device_fingerprint: str = Form(...)):
-
     global TEMP_CART_ORDER, CART
 
     order = next((o for o in MOCK_ORDERS if o["id"] == order_id), None)
@@ -253,17 +242,6 @@ async def create_payment(request: Request,
         )
 
         if intent.status == "succeeded":
-            log_payment_attempt(
-                transaction_id=intent.id,
-                order_id=order_id,
-                amount=order["amount"]/100,
-                currency=order["currency"],  
-                status="success",         
-                fraud_score=fraud_result.score,
-                ip_address=request.client.host, 
-                device_fingerprint=device_fingerprint,  
-                payment_method="card" 
-            )
             order["status"] = "SUCCESS"
 
             # ✅ Tạo nonce an toàn từ HSM (fallback phần mềm nếu HSM không khả dụng)
@@ -305,16 +283,6 @@ async def create_payment(request: Request,
     except stripe.CardError as e:
         body = e.json_body
         err = body.get('error', {})
-        logger.error(
-        "Card declined by Stripe",
-        extra={
-            'order_id': order_id,
-            'error_code': err.get('code'),
-            'error_message': err.get('message'),
-            'decline_code': err.get('decline_code'),
-            'ip_address': request.client.host
-        }
-    )
         return templates.TemplateResponse("error.html", {"request": request, "error": f"Payment failed: {err.get('message')}"})
 
     except stripe.InvalidRequestError as e:
@@ -323,13 +291,5 @@ async def create_payment(request: Request,
         return templates.TemplateResponse("error.html", {"request": request, "error": f"Invalid Data: {e}"})
 
     except Exception as e:
-        logger.error(
-        "Critical error in payment processing",
-        exc_info=True,
-        extra={
-            'order_id': order_id,
-            'ip_address': request.client.host,
-            'error_type': type(e).__name__
-        }
-    )
+        traceback.print_exc()
         return templates.TemplateResponse("error.html", {"request": request, "error": f"Error processing payment: {e}"})
