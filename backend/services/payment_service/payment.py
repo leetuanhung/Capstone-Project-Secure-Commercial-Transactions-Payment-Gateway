@@ -23,6 +23,16 @@ from backend.services.payment_service.security.fraud_detection import (
     TransactionInput
 )
 
+from backend.utils.logger import (
+    get_application_logger,
+    log_payment_attempt,
+    log_security_event,
+    get_error_logger,
+    get_transaction_logger
+)
+
+logger = get_transaction_logger(__name__)
+
 # =========================
 # CẤU HÌNH & KHỞI TẠO
 # =========================
@@ -168,10 +178,13 @@ async def create_payment(request: Request,
                          order_id: str = Form(...),
                          nonce: str = Form(...),
                          device_fingerprint: str = Form(...)):
+    # Log initial payment request safely (handle missing client)
+    client_ip = request.client.host if request.client else None
     logger.info(
         "Payment request received",
-        extra={'order_id': order_id, 'ip': request.client.host}
+        extra={'order_id': order_id, 'ip': client_ip}
     )
+
     global TEMP_CART_ORDER, CART
 
     order = next((o for o in MOCK_ORDERS if o["id"] == order_id), None)
@@ -188,6 +201,10 @@ async def create_payment(request: Request,
             'currency': order["currency"],
         }
     )
+
+    # Ensure fraud_result exists even if fraud detector raises
+    fraud_result = None
+
     # =========================
     # 🛡️ FRAUD DETECTION CHECK
     # =========================
