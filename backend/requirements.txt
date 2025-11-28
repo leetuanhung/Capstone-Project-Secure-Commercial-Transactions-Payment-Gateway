@@ -52,3 +52,4 @@ rsa==4.9.1
 six==1.17.0
 
 fastapi-mail
+fastapi uvicorn python-multipart

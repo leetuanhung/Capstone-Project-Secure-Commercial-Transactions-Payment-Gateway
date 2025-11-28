@@ -15,3 +15,12 @@
 {"timestamp": "2025-11-24 02:52:17.894130", "level": "\u001b[32mINFO\u001b[0m", "message": "Login attempt", "module": "user", "function": "login_post", "line": 219}
 {"timestamp": "2025-11-24 02:52:18.453170", "level": "\u001b[32mINFO\u001b[0m", "message": "Security: login_success", "module": "logger", "function": "log_security_event", "line": 263, "user_id": 4, "ip_address": "127.0.0.1"}
 {"timestamp": "2025-11-24 02:52:18.454854", "level": "\u001b[32mINFO\u001b[0m", "message": "User 4 logged in successfully", "module": "user", "function": "login_post", "line": 272}
+{"timestamp": "2025-11-28 09:48:38.636464", "level": "\u001b[32mINFO\u001b[0m", "message": "Login attempt", "module": "user", "function": "login_post", "line": 219}
+{"timestamp": "2025-11-28 09:48:39.197762", "level": "\u001b[32mINFO\u001b[0m", "message": "Security: login_success", "module": "logger", "function": "log_security_event", "line": 263, "user_id": 4, "ip_address": "127.0.0.1"}
+{"timestamp": "2025-11-28 09:48:39.198766", "level": "\u001b[32mINFO\u001b[0m", "message": "User 4 logged in successfully", "module": "user", "function": "login_post", "line": 272}
+{"timestamp": "2025-11-28 10:41:06.869767", "level": "\u001b[32mINFO\u001b[0m", "message": "Login attempt", "module": "user", "function": "login_post", "line": 219}
+{"timestamp": "2025-11-28 10:41:07.399825", "level": "\u001b[32mINFO\u001b[0m", "message": "Security: login_success", "module": "logger", "function": "log_security_event", "line": 263, "user_id": 4, "ip_address": "127.0.0.1"}
+{"timestamp": "2025-11-28 10:41:07.399825", "level": "\u001b[32mINFO\u001b[0m", "message": "User 4 logged in successfully", "module": "user", "function": "login_post", "line": 272}
+{"timestamp": "2025-11-28 11:31:08.436115", "level": "\u001b[32mINFO\u001b[0m", "message": "Login attempt", "module": "user", "function": "login_post", "line": 219}
+{"timestamp": "2025-11-28 11:31:08.963735", "level": "\u001b[32mINFO\u001b[0m", "message": "Security: login_success", "module": "logger", "function": "log_security_event", "line": 263, "user_id": 4, "ip_address": "127.0.0.1"}
+{"timestamp": "2025-11-28 11:31:08.964787", "level": "\u001b[32mINFO\u001b[0m", "message": "User 4 logged in successfully", "module": "user", "function": "login_post", "line": 272}

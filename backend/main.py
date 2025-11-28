@@ -1,4 +1,5 @@
-from fastapi import FastAPI, Form, Request, HTTPException
+from enum import verify
+from fastapi import FastAPI, Form, Request, HTTPException, requests, Header, BackgroundTasks
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from typing import Optional
@@ -22,6 +23,8 @@ from backend.middleware.hmac_verifier import HMACVerifierMiddleware
 from backend.middleware.cors import setup_cors
 from sqlalchemy import text
 import logging
+import stripe
+
 
 from backend.utils.logger import (
     init_logging,
@@ -29,6 +32,8 @@ from backend.utils.logger import (
     log_security_event,
     log_payment_attempt
 )
+from backend.webhooks.handler import dispatch_event
+from backend.webhooks.signature_verify import verify_stripe_signature
 
 # Initialize logging khi app start
 init_logging()
@@ -135,6 +140,17 @@ fake_users = load_users()
 # - order_service and payment_service provide their own MOCK_ORDERS, CART and payment handlers.
 # - To avoid duplicate state and routing, main.py delegates store/order/payment pages to the services.
 
+@app.post("/webhook")
+async def webhook_endpoint(
+    request: Request,
+    stripe_signature: str = Header(None),
+    background_tasks: BackgroundTasks = None
+):
+    payload = await request.body()
+    event = verify_stripe_signature(payload, stripe_signature)
+    background_tasks.add_task(dispatch_event, event)
+    
+    return {"status": "received", "message": "Event added to background queue"}
 
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request, message: Optional[str] = None):
