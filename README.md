@@ -144,3 +144,7 @@ NT219_Secure_Payment_Project/
 ```
 python -m uvicorn backend.main:app --reload
 
+# tao certificate và key
+openssl req -x509 -newkey rsa:2048 -keyout key.pem -out cert.pem -days 365 -nodes
+
+uvicorn backend.main:app --ssl-keyfile="backend/key.pem" --ssl-certfile="backend/cert.pem"

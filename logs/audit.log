@@ -1,0 +1,1 @@
+{"timestamp": "2025-11-29T02:37:57.230651", "level": "INFO", "message": "Audit: payment_completed", "module": "logger", "function": "log_audit_trail", "line": 315, "transaction_id": "pi_3SYe2qHxKDaqjWch12xnZcxL", "action": "payment_completed", "actor": "pi_3SYe2qHxKDaqjWch12xnZcxL", "target": "order:ORD-8D113ECD"}

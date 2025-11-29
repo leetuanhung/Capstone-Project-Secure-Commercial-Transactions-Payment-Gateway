@@ -88,7 +88,7 @@ class JsonFormatter(logging.Formatter):
 
     def format(self, record: logging.LogRecord):
         log_data = {
-            "timestamp": datetime.utcnow(),
+            "timestamp": datetime.utcnow().isoformat(),
             "level": record.levelname,
             "message": record.getMessage(),
             "module": record.module,
@@ -96,7 +96,8 @@ class JsonFormatter(logging.Formatter):
             "line": record.lineno,
         }
 
-        for key in ["user_id", "transaction_id", "ip_address", "order_id"]:
+        # Add extra fields if present
+        for key in ["user_id", "transaction_id", "ip_address", "order_id", "event_type", "action", "actor", "target"]:
             if hasattr(record, key):
                 log_data[key] = getattr(record, key)
 
@@ -123,20 +124,14 @@ class ColoredFormatter(logging.Formatter):
         record.levelname = f"{color}{record.levelname}{self.RESET}"
         return super().format(record)
 
-"""
-- log_file: duong dan den tep se duoc thuc thi
-- level: (debug, info, warning, error)
-
-"""
 
 def setup_file_handler(
     log_file: Path, level: int = logging.INFO, use_json: bool = True
 ):
+    """Setup rotating file handler with JSON or text format"""
     handler = logging.handlers.RotatingFileHandler(
         log_file, maxBytes=MAX_BYTES, backupCount=BACKUP_COUNT, encoding="utf-8"
     )
-    # Khi dat kich thuc toi da thi xoay vong
-
     handler.setLevel(level)
     
     if use_json:
@@ -149,17 +144,21 @@ def setup_file_handler(
     handler.addFilter(SensitiveDataFilter())
     return handler
 
+
 def setup_console_handler(level: int = logging.INFO):
+    """Setup console handler with colored output"""
     handler = logging.StreamHandler()
     handler.setLevel(level)
     
     formatter = ColoredFormatter(
-        '%(asctime)s - %(name)s - %(levelname)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S'
+        '%(asctime)s - %(name)s - %(levelname)s - %(message)s', 
+        datefmt='%Y-%m-%d %H:%M:%S'
     )
     handler.setFormatter(formatter)
     handler.addFilter(SensitiveDataFilter())
     
     return handler
+
 
 def get_logger(
     name: str,
@@ -167,60 +166,91 @@ def get_logger(
     console: bool = True,
     file_type: str = 'application'
 ):
+    """
+    Get or create a logger with specified configuration
+    
+    Args:
+        name: Logger name
+        level: Log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+        console: Enable console output
+        file_type: Type of log file (application, security, transactions, audit, errors)
+    
+    Returns:
+        logging.Logger: Configured logger instance
+    """
     logger = logging.getLogger(name)
     
-    log_level = getattr(logging, level or LOG_LEVEL,logging.INFO)
+    # Set log level
+    log_level = getattr(logging, level or LOG_LEVEL, logging.INFO)
     logger.setLevel(log_level)
     
+    # Avoid duplicate handlers
     if logger.handlers:
         return logger
     
+    # Add console handler
     if console:
         logger.addHandler(setup_console_handler(log_level))
-        
+    
+    # Add file handler
     if file_type in LOG_FILES:
         logger.addHandler(setup_file_handler(
-                          LOG_FILES[file_type],
-                          log_level,
-                          use_json = True))
-        
-        return logger
+            LOG_FILES[file_type],
+            log_level,
+            use_json=True
+        ))
     
+    # ✅ FIX: Return logger OUTSIDE the if block
+    return logger
+
+
 def get_application_logger(name: str = 'app'):
-    
-    return get_logger(name, file_type = 'application', console = True)
+    """Get application logger (logs to application.log)"""
+    return get_logger(name, file_type='application', console=True)
+
 
 def get_security_logger(name: str = 'security'):
-    
-    return get_logger(name, file_type='security')
+    """Get security logger (logs to security.log)"""
+    return get_logger(name, file_type='security', console=True)
+
 
 def get_transaction_logger(name: str = 'transaction'):
-    
-    return get_logger(name, file_type='transactions', console = True)
+    """Get transaction logger (logs to transactions.log)"""
+    return get_logger(name, file_type='transactions', console=True)
+
 
 def get_audit_logger(name: str = 'audit'):
-    
+    """Get audit logger (logs to audit.log with JSON format only)"""
     logger = logging.getLogger(name)
-    if not logger.handlers:
-        logger.setLevel(logging.INFO)
-        
-        handler = logging.FileHandler(
-            LOG_FILES['audit'],
-            mode = 'a',
-            encoding = 'utf-8'
-        )
-        
-        handler.setFormatter(JsonFormatter())
-        handler.addFilter(SensitiveDataFilter())
-        logger.addHandler(handler)
-
-        logger.addHandler(setup_console_handler())
-        
-    return logger        
-        
-def get_error_logger(name: str = 'error'):
     
-    return get_logger(name, level = 'ERROR', FileType = 'errors', console = True)
+    # Avoid duplicate handlers
+    if logger.handlers:
+        return logger
+    
+    logger.setLevel(logging.INFO)
+    
+    # File handler (JSON only, no console)
+    handler = logging.FileHandler(
+        LOG_FILES['audit'],
+        mode='a',
+        encoding='utf-8'
+    )
+    handler.setFormatter(JsonFormatter())
+    handler.addFilter(SensitiveDataFilter())
+    logger.addHandler(handler)
+    
+    return logger
+
+
+def get_error_logger(name: str = 'error'):
+    """Get error logger (logs to errors.log, ERROR level only)"""
+    # ✅ FIX: file_type instead of FileType
+    return get_logger(name, level='ERROR', file_type='errors', console=True)
+
+
+# ============================
+# HIGH-LEVEL LOGGING FUNCTIONS
+# ============================
 
 def log_payment_attempt(
     transaction_id: str,
@@ -230,6 +260,7 @@ def log_payment_attempt(
     status: str,
     **kwargs
 ):
+    """Log payment attempt to application log"""
     logger = get_application_logger()
     logger.info(
         f"Payment {status}",
@@ -242,7 +273,8 @@ def log_payment_attempt(
             **kwargs
         }
     )
-    
+
+
 def log_security_event(
     event_type: str,
     severity: str,
@@ -250,6 +282,7 @@ def log_security_event(
     ip_address: Optional[str] = None,
     details: Optional[Dict] = None
 ):
+    """Log security event to security.log"""
     logger = get_security_logger()
     
     log_func = {
@@ -269,13 +302,15 @@ def log_security_event(
             **(details or {})
         }
     )
-    
+
+
 def log_audit_trail(
     action: str,
     actor_user_id: str,
     target: str,
     details: Optional[Dict] = None
 ):
+    """Log audit trail to audit.log"""
     logger = get_audit_logger()
     logger.info(
         f"Audit: {action}",
@@ -286,9 +321,13 @@ def log_audit_trail(
             **(details or {})
         }
     )
-    
+
+
 def init_logging():
-    
+    """Initialize logging system (create log files if not exist)"""
     for log_name, log_file in LOG_FILES.items():
         if not log_file.exists():
             log_file.touch()
+    
+    print(f"✅ Logging initialized: {len(LOG_FILES)} log files ready")
+    print(f"📁 Log directory: {LOG_DIR}")

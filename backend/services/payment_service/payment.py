@@ -13,14 +13,14 @@ import base64
 from backend.config.config import settings
 from backend.services.payment_service.security.hsm_client import (
     sign_data,
-    generate_secure_random
+    generate_secure_random,
 )
 from backend.services.payment_service.security.hsm_client import HSMError
 from backend.services.payment_service.security.tokenization import card_tokenizer
 from backend.services.payment_service.security.encryption import DataMasking
 from backend.services.payment_service.security.fraud_detection import (
     FraudDetector,
-    TransactionInput
+    TransactionInput,
 )
 
 from backend.utils.logger import (
@@ -28,7 +28,8 @@ from backend.utils.logger import (
     log_payment_attempt,
     log_security_event,
     get_error_logger,
-    get_transaction_logger
+    get_transaction_logger,
+    log_audit_trail,
 )
 
 logger = get_transaction_logger(__name__)
@@ -55,8 +56,18 @@ try:
     from backend.services.order_service.order import MOCK_ORDERS, CART
 except Exception:
     MOCK_ORDERS = [
-        {"id": "ORD-DEMO-01", "description": "Product A", "amount": 150000, "currency": "vnd"},
-        {"id": "ORD-DEMO-02", "description": "Product B", "amount": 300000, "currency": "vnd"},
+        {
+            "id": "ORD-DEMO-01",
+            "description": "Product A",
+            "amount": 150000,
+            "currency": "vnd",
+        },
+        {
+            "id": "ORD-DEMO-02",
+            "description": "Product B",
+            "amount": 300000,
+            "currency": "vnd",
+        },
     ]
     CART = []
 
@@ -68,6 +79,7 @@ router = APIRouter(tags=["Payment Service"])
 # =========================
 fraud_detector = FraudDetector()
 
+
 # =========================
 # HÀM KÝ BIÊN LAI BẰNG HSM
 # =========================
@@ -75,7 +87,7 @@ def create_signed_receipt(transaction_data: dict) -> dict:
     """Ký biên lai thanh toán bằng HSM nếu có; fallback phần mềm nếu HSM không khả dụng."""
     payload = json.dumps(transaction_data, sort_keys=True).encode()
     try:
-        signature = sign_data(payload, key_label="DemoKey")   # 🔐 Ký thật bằng HSM
+        signature = sign_data(payload, key_label="DemoKey")  # 🔐 Ký thật bằng HSM
         return {"signed_receipt": signature, "signed_by": "HSM-DemoKey"}
     except (HSMError, Exception):
         # Fallback an toàn: dùng SHA-256 làm dấu vết + random salt (KHÔNG thay thế chữ ký thật)
@@ -83,6 +95,7 @@ def create_signed_receipt(transaction_data: dict) -> dict:
         digest = hashlib.sha256(salt + payload).digest()
         soft_sig = base64.b64encode(digest).decode()
         return {"signed_receipt": soft_sig, "signed_by": "SOFTWARE-FALLBACK"}
+
 
 # =========================
 # API ROUTES
@@ -104,7 +117,9 @@ async def tokenize_card(
 ):
     """Nhận dữ liệu thẻ và trả về token cùng số thẻ đã che (demo học tập)."""
     try:
-        result = card_tokenizer.generate_token(card_number, cvv, expiry, cardholder_name)
+        result = card_tokenizer.generate_token(
+            card_number, cvv, expiry, cardholder_name
+        )
         masked = DataMasking.mask_card_number(card_number)
         return {
             "token": result["token"],
@@ -134,6 +149,7 @@ async def delete_token(token: str = Form(...)):
         raise HTTPException(status_code=404, detail="Token not found")
     return {"deleted": True}
 
+
 @router.get("/checkout", response_class=HTMLResponse)
 async def checkout_single_order(request: Request, order_id: str):
     order = next((o for o in MOCK_ORDERS if o["id"] == order_id), None)
@@ -145,6 +161,7 @@ async def checkout_single_order(request: Request, order_id: str):
         "checkout.html",
         {"request": request, "order": order, "stripe_public_key": STRIPE_PUBLIC_KEY},
     )
+
 
 @router.get("/checkout_cart", response_class=HTMLResponse)
 async def checkout_cart(request: Request):
@@ -163,26 +180,31 @@ async def checkout_cart(request: Request):
         "status": "PENDING",
     }
 
-    return templates.TemplateResponse("checkout.html", {
-        "request": request,
-        "order": TEMP_CART_ORDER[order_id],
-        "stripe_public_key": STRIPE_PUBLIC_KEY
-    })
+    return templates.TemplateResponse(
+        "checkout.html",
+        {
+            "request": request,
+            "order": TEMP_CART_ORDER[order_id],
+            "stripe_public_key": STRIPE_PUBLIC_KEY,
+        },
+    )
+
 
 # =========================
 # XỬ LÝ THANH TOÁN
 # =========================
 @router.post("/create_payment")
-async def create_payment(request: Request,
-                         payment_token: str = Form(...),
-                         order_id: str = Form(...),
-                         nonce: str = Form(...),
-                         device_fingerprint: str = Form(...)):
+async def create_payment(
+    request: Request,
+    payment_token: str = Form(...),
+    order_id: str = Form(...),
+    nonce: str = Form(...),
+    device_fingerprint: str = Form(...),
+):
     # Log initial payment request safely (handle missing client)
     client_ip = request.client.host if request.client else None
     logger.info(
-        "Payment request received",
-        extra={'order_id': order_id, 'ip': client_ip}
+        "Payment request received", extra={"order_id": order_id, "ip": client_ip}
     )
 
     global TEMP_CART_ORDER, CART
@@ -191,15 +213,17 @@ async def create_payment(request: Request,
     if not order:
         order = TEMP_CART_ORDER.get(order_id)
     if not order:
-        return templates.TemplateResponse("error.html", {"request": request, "error": "Order not found"})
+        return templates.TemplateResponse(
+            "error.html", {"request": request, "error": "Order not found"}
+        )
 
     logger.info(
         "Payment processing initiated for order",
         extra={
-            'order_id': order_id,
-            'amount': order["amount"],
-            'currency': order["currency"],
-        }
+            "order_id": order_id,
+            "amount": order["amount"],
+            "currency": order["currency"],
+        },
     )
 
     # Ensure fraud_result exists even if fraud detector raises
@@ -211,36 +235,52 @@ async def create_payment(request: Request,
     try:
         # Lấy thông tin client
         client_ip = request.client.host if request.client else None
-        
+
         # Tạo transaction input để kiểm tra
         fraud_check = TransactionInput(
             user_id=order_id,  # Có thể thay bằng user_id thật từ session/JWT
-            amount=float(order["amount"]) / 100 if order["currency"] == "vnd" else float(order["amount"]),  # Convert VND về đơn vị chuẩn
+            amount=(
+                float(order["amount"]) / 100
+                if order["currency"] == "vnd"
+                else float(order["amount"])
+            ),  # Convert VND về đơn vị chuẩn
             currency=order["currency"],
             ip_address=client_ip,
-            billing_country="VN"  # Có thể lấy từ form hoặc user profile
+            billing_country="VN",  # Có thể lấy từ form hoặc user profile
         )
-        
+
         # Kiểm tra fraud
         fraud_result = fraud_detector.assess_transaction(fraud_check)
-        
+
         # Nếu phát hiện fraud, chặn giao dịch
         if fraud_result.is_fraud:
             log_security_event(
-                event_type='fraud_blocked',
-                severity='critical',
+                event_type="fraud_blocked",
+                severity="critical",
                 user_id=order_id,
                 ip_address=request.client.host,
                 details={
-                    'fraud_score': fraud_result.score,
-                    'rules': fraud_result.triggered_rules
-                }
+                    "fraud_score": fraud_result.score,
+                    "rules": fraud_result.triggered_rules,
+                },
             )
-            return templates.TemplateResponse("error.html", {
-                "request": request,
-                "error": f"⚠️ Transaction blocked: {fraud_result.message} (Score: {fraud_result.score:.2f})"
-            })
-    
+            log_audit_trail(
+                action="payment_blocked",
+                actor_user_id=str(order_id),
+                target=f"order:{order_id}",
+                details={
+                    "fraud_score": fraud_result.score,
+                    "rules": fraud_result.triggered_rules,
+                },
+            )
+            return templates.TemplateResponse(
+                "error.html",
+                {
+                    "request": request,
+                    "error": f"⚠️ Transaction blocked: {fraud_result.message} (Score: {fraud_result.score:.2f})",
+                },
+            )
+
     except Exception as e:
         # Log lỗi nhưng vẫn cho phép giao dịch tiếp tục (fail-open mode)
         print(f"⚠️ Fraud detection error: {e}")
@@ -254,23 +294,31 @@ async def create_payment(request: Request,
             amount=order["amount"],
             currency=order["currency"],
             description=order["description"],
-            payment_method_data={
-                "type": "card",
-                "card": {"token": payment_token}
-            },
+            payment_method_data={"type": "card", "card": {"token": payment_token}},
             confirm=True,
-            return_url="http://127.0.0.1:8000/success_payment"
+            return_url="http://127.0.0.1:8000/success_payment",
         )
 
         if intent.status == "succeeded":
             log_payment_attempt(
                 transaction_id=intent.id,
                 order_id=order_id,
-                amount=order["amount"]/100,
-                currency='success',
+                amount=order["amount"] / 100,
+                currency="success",
                 status=intent.status,
                 fraud_score=fraud_result.score,
-                masked_card=card_tokenizer
+                masked_card=card_tokenizer,
+            )
+            log_audit_trail(
+                action="payment_completed",
+                actor_user_id=str(intent.id),  # Từ JWT
+                target=f"order:{order_id}",
+                details={
+                    "transaction_id": intent.id,
+                    "amount": order["amount"],
+                    "currency": order["currency"],
+                    "fraud_score": fraud_result.score if fraud_result else None,
+                },
             )
             order["status"] = "SUCCESS"
 
@@ -284,7 +332,7 @@ async def create_payment(request: Request,
             receipt_data = {
                 "transaction_id": intent.id,
                 "timestamp": int(time.time()),
-                "nonce": nonce_value
+                "nonce": nonce_value,
             }
 
             # ✅ Ký biên lai bằng HSM
@@ -294,34 +342,59 @@ async def create_payment(request: Request,
                 del TEMP_CART_ORDER[order_id]
                 CART.clear()
 
-            return templates.TemplateResponse("success.html", {
-                "request": request,
-                "receipt": receipt_data,
-                "order": order,
-                "signed_receipt": signed_receipt
-            })
+            return templates.TemplateResponse(
+                "success.html",
+                {
+                    "request": request,
+                    "receipt": receipt_data,
+                    "order": order,
+                    "signed_receipt": signed_receipt,
+                },
+            )
 
         else:
-            
-            logger.warning(f"Payment incomplete: {intent.status}", extra={'order id': order_id})
+
+            logger.warning(
+                f"Payment incomplete: {intent.status}", extra={"order id": order_id}
+            )
 
             return templates.TemplateResponse(
                 "error.html",
-                {"request": request, "error": f"Payment requires confirmation. Status: {intent.status}"}
-            )            
+                {
+                    "request": request,
+                    "error": f"Payment requires confirmation. Status: {intent.status}",
+                },
+            )
 
     except stripe.CardError as e:
         body = e.json_body
-        err = body.get('error', {})
-        logger.warning(f"Card declined: {err.message}", extra={'order_id':order_id, 'code': err.code})
-        return templates.TemplateResponse("error.html", {"request": request, "error": f"Payment failed: {err.get('message')}"})
+        err = body.get("error", {})
+        logger.warning(
+            f"Card declined: {err.message}",
+            extra={"order_id": order_id, "code": err.code},
+        )
+        return templates.TemplateResponse(
+            "error.html",
+            {"request": request, "error": f"Payment failed: {err.get('message')}"},
+        )
 
     except stripe.InvalidRequestError as e:
         # Ghi log lỗi request (như lỗi URL vừa rồi) vào file errors.log
-        logger.error(f"Stripe Invalid Request: {e}", exc_info=True, extra={'order_id': order_id})
-        return templates.TemplateResponse("error.html", {"request": request, "error": f"Invalid Data: {e}"})
+        logger.error(
+            f"Stripe Invalid Request: {e}", exc_info=True, extra={"order_id": order_id}
+        )
+        return templates.TemplateResponse(
+            "error.html", {"request": request, "error": f"Invalid Data: {e}"}
+        )
 
     except Exception as e:
         traceback.print_exc()
-        logger.error("Critical error in payment processing", exc_info=True, extra={'order_id': order_id})
-        return templates.TemplateResponse("error.html", {"request": request, "error": f"Error processing payment: {e}"})
+        logger.error(
+            "Critical error in payment processing",
+            exc_info=True,
+            extra={"order_id": order_id},
+        )
+        return templates.TemplateResponse(
+            "error.html",
+            {"request": request, "error": f"Error processing payment: {e}"},
+        )
