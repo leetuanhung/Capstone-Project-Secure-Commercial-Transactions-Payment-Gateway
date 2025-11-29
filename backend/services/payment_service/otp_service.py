@@ -5,8 +5,9 @@ Gửi mã OTP qua Gmail để xác thực thanh toán (2FA)
 import smtplib
 import secrets
 import time
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
+import ssl
+import traceback
+from email.message import EmailMessage
 from typing import Optional
 import os
 from dotenv import load_dotenv
@@ -126,18 +127,16 @@ class OTPService:
         """
         
         try:
-            # Tạo message
-            msg = MIMEMultipart('alternative')
-            msg['Subject'] = subject
-            msg['From'] = GMAIL_USER
-            msg['To'] = email
-            
-            # Attach HTML
-            html_part = MIMEText(html_body, 'html')
-            msg.attach(html_part)
-            
-            # Kết nối SMTP Gmail
-            with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
+            # Tạo message giống test.py
+            msg = EmailMessage()
+            msg["Subject"] = subject
+            msg["From"] = GMAIL_USER
+            msg["To"] = email
+            msg.set_content(html_body, subtype='html')
+
+            # Kết nối SMTP Gmail giống test.py
+            context = ssl.create_default_context()
+            with smtplib.SMTP_SSL('smtp.gmail.com', 465, context=context) as server:
                 server.login(GMAIL_USER, GMAIL_APP_PASSWORD)
                 server.send_message(msg)
             

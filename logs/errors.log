@@ -1,0 +1,4 @@
+{"timestamp": "2025-11-29T12:10:49.742077", "level": "\u001b[31mERROR\u001b[0m", "message": "STRIPE_WEBHOOK_SECRET is not set; webhook signature verification will fail.", "module": "signature_verify", "function": "<module>", "line": 11}
+{"timestamp": "2025-11-29T12:15:12.365377", "level": "\u001b[31mERROR\u001b[0m", "message": "STRIPE_WEBHOOK_SECRET is not set; webhook signature verification will fail.", "module": "signature_verify", "function": "<module>", "line": 11}
+{"timestamp": "2025-11-29T12:44:02.076155", "level": "\u001b[31mERROR\u001b[0m", "message": "STRIPE_WEBHOOK_SECRET is not set; webhook signature verification will fail.", "module": "signature_verify", "function": "<module>", "line": 11}
+{"timestamp": "2025-11-29T12:48:28.444359", "level": "\u001b[31mERROR\u001b[0m", "message": "STRIPE_WEBHOOK_SECRET is not set; webhook signature verification will fail.", "module": "signature_verify", "function": "<module>", "line": 11}

@@ -1,5 +1,4 @@
 <!DOCTYPE html>
-
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
@@ -7,12 +6,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link href="https://fonts.googleapis.com/css?family=Quicksand:500,700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css"/>
-<!-- Tải Stripe JS SDK - Cần thiết cho Hosted Fields -->
+<!-- Stripe JS SDK -->
 <script src="https://js.stripe.com/v3/"></script>
+
 <style>
-/* ==========================================
- * MODERN CHECKOUT DESIGN - SECURE PAYMENT
- * ========================================== */
 :root {
   --primary: #667eea;
   --primary-dark: #5568d3;
@@ -44,13 +41,12 @@ body {
   overflow: hidden;
 }
 
-/* Animated background with security theme */
 body::before {
   content: '';
   position: absolute;
   width: 200%;
   height: 200%;
-  background: 
+  background:
     radial-gradient(circle at 20% 50%, rgba(255, 255, 255, 0.1) 0%, transparent 50%),
     radial-gradient(circle at 80% 80%, rgba(255, 255, 255, 0.1) 0%, transparent 50%);
   animation: float 20s ease-in-out infinite;
@@ -67,7 +63,7 @@ body::before {
   background: var(--white);
   padding: 50px 40px;
   border-radius: 24px;
-  box-shadow: 
+  box-shadow:
     0 20px 60px rgba(0, 0, 0, 0.3),
     0 0 0 1px rgba(255, 255, 255, 0.1) inset;
   width: 100%;
@@ -86,7 +82,6 @@ body::before {
   }
 }
 
-/* Header with Security Icon */
 h2 {
   text-align: center;
   color: var(--dark);
@@ -102,15 +97,14 @@ h2 {
 
 h2 i {
   color: var(--success);
-  animation: pulse 2s ease-in-out infinite;
+  animation: pulseIcon 2s ease-in-out infinite;
 }
 
-@keyframes pulse {
+@keyframes pulseIcon {
   0%, 100% { transform: scale(1); opacity: 1; }
   50% { transform: scale(1.1); opacity: 0.8; }
 }
 
-/* Order Summary Box */
 .order-summary {
   background: linear-gradient(135deg, #f1f5f9, #e2e8f0);
   padding: 24px;
@@ -153,51 +147,336 @@ h2 i {
   font-weight: 800;
 }
 
-/* Form Styling */
 .form-group {
   margin-bottom: 24px;
   animation: fadeIn 0.5s ease-out backwards;
 }
 
-.form-group:nth-child(2) { animation-delay: 0.3s; }
-.form-group:nth-child(3) { animation-delay: 0.4s; }
-
 .form-group label {
   display: block;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
   font-weight: 600;
   color: var(--dark);
-  font-size: 14px;
+  font-size: 15px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
-/* Card Holder Name Input */
-.form-group input[type="text"] {
+.form-group label i {
+  color: var(--primary);
+  font-size: 16px;
+}
+
+.form-group label::before {
+  content: '🔒 ';
+}
+
+/* Email input */
+.email-input {
   width: 100%;
-  padding: 14px 16px;
+  padding: 14px 18px;
   border: 2px solid #e2e8f0;
   border-radius: 12px;
-  background: var(--light);
-  font-size: 15px;
-  font-family: 'Inter', sans-serif;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  background: #f8fafc;
+  font-size: 16px;
   outline: none;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  transition: all 0.3s ease;
+  font-family: 'Inter', sans-serif;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
-.form-group input[type="text"]:focus {
-  border-color: var(--primary);
-  background: var(--white);
-  box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+.email-input:focus {
+  border-color: #667eea;
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1), 0 4px 12px rgba(0, 0, 0, 0.1);
+  transform: translateY(-1px);
+}
+
+.email-input.error {
+  border-color: #ef4444;
+  background: #fef2f2;
+}
+
+/* OTP button */
+.otp-button {
+  width: 100%;
+  padding: 14px 20px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  position: relative;
+  overflow: hidden;
+}
+
+.otp-button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+  transition: left 0.5s;
+}
+
+.otp-button:hover:not(:disabled) {
+  background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%);
   transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
 }
 
-.form-group input[type="text"]::placeholder {
-  text-transform: none;
-  letter-spacing: normal;
+.otp-button:hover:not(:disabled)::before {
+  left: 100%;
 }
 
-/* Stripe Hosted Fields Styling */
+.otp-button:disabled {
+  background: #94a3b8;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.otp-button.success {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  animation: successBounce 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+@keyframes successBounce {
+  0% { transform: scale(1); }
+  25% { transform: scale(1.1); }
+  50% { transform: scale(0.95); }
+  75% { transform: scale(1.05); }
+  100% { transform: scale(1); }
+}
+
+.confetti-particle {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  background: var(--primary);
+  top: 50%;
+  left: 50%;
+  border-radius: 50%;
+  animation: confetti-fall 1s ease-out forwards;
+  pointer-events: none;
+}
+
+@keyframes confetti-fall {
+  0% {
+    transform: translateY(0) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(200px) rotate(360deg);
+    opacity: 0;
+  }
+}
+
+/* OTP input group */
+.otp-input-group {
+  margin-bottom: 24px;
+  animation: slideDown 0.4s ease-out;
+  background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+  padding: 20px;
+  border-radius: 16px;
+  border: 2px solid #e2e8f0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.otp-input-container {
+  display: flex;
+  gap: 12px;
+  align-items: stretch;
+  margin-bottom: 12px;
+}
+
+.otp-input {
+  flex: 1;
+  padding: 12px 16px;
+  border: 2px solid #e2e8f0;
+  border-radius: 12px;
+  background: #f8fafc;
+  font-size: 18px;
+  font-weight: 600;
+  text-align: center;
+  letter-spacing: 4px;
+  outline: none;
+  transition: all 0.3s ease;
+  font-family: 'Inter', monospace;
+}
+
+.otp-input:focus {
+  border-color: #667eea;
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  transform: scale(1.02);
+}
+
+.otp-input.error {
+  border-color: #ef4444;
+  background: #fef2f2;
+  animation: shake 0.5s ease-in-out;
+}
+
+.otp-input.success {
+  border-color: #10b981;
+  background: #f0fdf4;
+  animation: successPulse 0.6s ease-out;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-5px); }
+  75% { transform: translateX(5px); }
+}
+
+@keyframes successPulse {
+  0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
+  50% { transform: scale(1.02); box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.2); }
+  100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+}
+
+/* Resend + Verify buttons */
+.resend-btn,
+.verify-otp-btn {
+  padding: 12px 20px;
+  border: none;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.resend-btn {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: white;
+}
+
+.resend-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #d97706, #b45309);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+}
+
+.resend-btn:disabled,
+.verify-otp-btn:disabled {
+  background: #d1d5db;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.verify-otp-btn {
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+  color: white;
+}
+
+.verify-otp-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #16a34a, #15803d);
+  transform: translateY(-1px);
+}
+
+/* OTP Timer */
+.otp-timer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 14px;
+  color: #64748b;
+  font-weight: 500;
+  margin-top: 4px;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.5);
+  border-radius: 8px;
+}
+
+.otp-timer i {
+  color: #10b981;
+  animation: pulseTimer 2s infinite;
+}
+
+@keyframes pulseTimer {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.countdown {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: white;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-weight: 600;
+  font-family: 'Inter', monospace;
+  min-width: 70px;
+  text-align: center;
+}
+
+.countdown.warning {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+}
+
+.countdown.expired {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+}
+
+/* OTP messages */
+.otp-message {
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  animation: slideDown 0.3s ease-out;
+}
+
+.otp-message.success {
+  background: #d1fae5;
+  color: #065f46;
+  border: 1px solid #a7f3d0;
+}
+
+.otp-message.error {
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+}
+
+.otp-message i {
+  font-size: 16px;
+}
+
+/* Stripe card element */
 #card-element {
   border: 2px solid #e2e8f0;
   border-radius: 12px;
@@ -224,8 +503,9 @@ h2 i {
   background: #d1fae5;
 }
 
-/* Error & Loading Messages */
-.payment-errors, .loading-message {
+/* Error & loading */
+.payment-errors,
+.loading-message {
   margin-top: 16px;
   margin-bottom: 16px;
   padding: 12px 16px;
@@ -234,17 +514,6 @@ h2 i {
   font-weight: 600;
   font-size: 14px;
   animation: slideDown 0.3s ease-out;
-}
-
-@keyframes slideDown {
-  from {
-    opacity: 0;
-    transform: translateY(-10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
 }
 
 .payment-errors {
@@ -277,7 +546,7 @@ h2 i {
   to { transform: rotate(360deg); }
 }
 
-/* Pay Button */
+/* Pay button */
 .pay-button {
   width: 100%;
   padding: 16px;
@@ -333,78 +602,6 @@ h2 i {
   box-shadow: none;
 }
 
-.pay-button i {
-  font-size: 18px;
-}
-
-/* Security Badge */
-.checkout-container::after {
-  content: '';
-  display: block;
-  text-align: center;
-  margin-top: 24px;
-  padding-top: 24px;
-  border-top: 1px solid #e2e8f0;
-  font-size: 12px;
-  color: var(--gray);
-}
-
-/* Responsive Design */
-@media (max-width: 600px) {
-  body {
-    padding: 20px 10px;
-  }
-  
-  .checkout-container {
-    padding: 32px 24px;
-  }
-  
-  h2 {
-    font-size: 1.6rem;
-    flex-direction: column;
-    gap: 8px;
-  }
-  
-  .order-summary {
-    padding: 20px;
-  }
-  
-  .order-summary p {
-    font-size: 14px;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 4px;
-  }
-  
-  .order-summary strong {
-    font-size: 1.2rem;
-  }
-  
-  .form-group {
-    margin-bottom: 20px;
-  }
-  
-  .pay-button {
-    font-size: 16px;
-    padding: 14px;
-  }
-}
-
-@media (max-width: 400px) {
-  .checkout-container {
-    padding: 24px 16px;
-  }
-  
-  h2 {
-    font-size: 1.4rem;
-  }
-  
-  .order-summary {
-    padding: 16px;
-  }
-}
-
-/* Processing State */
 .pay-button.processing {
   pointer-events: none;
 }
@@ -420,20 +617,7 @@ h2 i {
   animation: spin 0.6s linear infinite;
 }
 
-/* Success State Animation */
-@keyframes success {
-  0% { transform: scale(1); }
-  50% { transform: scale(1.05); }
-  100% { transform: scale(1); }
-}
-
-/* Security Indicators */
-.form-group label::before {
-  content: '🔒 ';
-  margin-right: 4px;
-}
-
-/* Trust badges area */
+/* Trust badge */
 .checkout-container > form::after {
   content: '🔐 Thanh toán được bảo mật bởi Stripe';
   display: block;
@@ -445,160 +629,555 @@ h2 i {
   color: var(--gray);
   font-weight: 600;
 }
-</style>
 
+/* Responsive */
+@media (max-width: 600px) {
+  body {
+    padding: 20px 10px;
+  }
+
+  .checkout-container {
+    padding: 32px 24px;
+  }
+
+  h2 {
+    font-size: 1.6rem;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .order-summary {
+    padding: 20px;
+  }
+
+  .order-summary p {
+    font-size: 14px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+
+  .order-summary strong {
+    font-size: 1.2rem;
+  }
+
+  .form-group {
+    margin-bottom: 20px;
+  }
+
+  .otp-input-container {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .resend-btn,
+  .verify-otp-btn {
+    align-self: flex-start;
+  }
+
+  .otp-timer {
+    font-size: 13px;
+    justify-content: flex-start;
+  }
+
+  .countdown {
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 400px) {
+  .checkout-container {
+    padding: 24px 16px;
+  }
+
+  h2 {
+    font-size: 1.4rem;
+  }
+
+  .order-summary {
+    padding: 16px;
+  }
+}
+</style>
 </head>
+
 <body>
 <div class="checkout-container">
-<h2><i class="fa-solid fa-shield-halved"></i> Thanh Toán An Toàn</h2>
+  <h2><i class="fa-solid fa-shield-halved"></i> Thanh Toán An Toàn</h2>
 
-    <div class="order-summary">
-        <p>Mô tả: <span>{{ order.description }}</span></p>
-        <p>Mã đơn hàng: <span>{{ order.id }}</span></p>
-        <p>Tổng cộng: <strong>{{ "{:,.0f}".format(order.amount | int) }} {{ order.currency }}</strong></p>
+  <div class="order-summary">
+    <p>Mô tả: <span>{{ order.description }}</span></p>
+    <p>Mã đơn hàng: <span>{{ order.id }}</span></p>
+    <p>Tổng cộng: <strong>{{ "{:,.0f}".format(order.amount | int) }} {{ order.currency }}</strong></p>
+  </div>
+
+  <form id="payment-form">
+    <!-- Hidden fields -->
+    <input type="hidden" id="order-id" name="order_id" value="{{ order.id }}">
+    <input type="hidden" id="payment-token-input" name="payment_token">
+    <input type="hidden" id="nonce-input" name="nonce">
+    <input type="hidden" id="device-fingerprint-input" name="device_fingerprint">
+    <input type="hidden" id="user-id-input" name="user_id">
+
+    <!-- 1. Email -->
+    <div class="form-group">
+      <label for="email-input">
+        <i class="fa-solid fa-envelope"></i> Email xác thực (nhận OTP)
+      </label>
+      <input type="email" id="email-input" name="email" class="email-input" placeholder="example@email.com" required>
     </div>
 
-    <form id="payment-form">
-        <input type="hidden" id="order-id" name="order_id" value="{{ order.id }}">
-        <input type="hidden" id="payment-token-input" name="payment_token">
-        <input type="hidden" id="nonce-input" name="nonce">
-        <input type="hidden" id="device-fingerprint-input" name="device_fingerprint">
-        <input type="hidden" id="user-id-input" name="user_id">
-
-        <!-- 1. Hosted Fields Placeholder (PCI Scope Reduction) -->
-        <div class="form-group">
-            <label for="card-holder-name">Tên chủ thẻ</label>
-            <input type="text" id="card-holder-name" placeholder="Ví dụ: NGUYEN VAN A" required 
-                   style="width: 100%; padding: 11px 12px; border: 1.5px solid #b2bec3; border-radius: 8px; background: #f5f6fa; font-size: 16px; box-sizing: border-box; outline: none;">
-        </div>
-
-        <div class="form-group">
-            <label>Thông tin thẻ (Được bảo mật bởi PSP)</label>
-            <!-- Thẻ tín dụng, ngày hết hạn, CVC sẽ được chèn vào đây bởi Stripe -->
-            <div id="card-element">
-                <!-- Hosted Fields (iFrame) sẽ được chèn vào đây -->
-            </div>
-        </div>
-        
-        <div id="payment-errors" class="payment-errors"></div>
-        <div id="loading-message" class="loading-message" style="display: none;">Đang xử lý giao dịch... Vui lòng đợi.</div>
-        
-        <!-- 2. Nút Thanh Toán -->
-        <button id="submit-button" class="pay-button">
-            <i class="fa-solid fa-shield-check"></i> Thanh Toán {{ "{:,.0f}".format(order.amount | int) }} VND
+    <!-- 2. OTP Input (ẩn ban đầu) -->
+    <div class="form-group otp-input-group" id="otp-group" style="display: none;">
+      <label for="otp-input">
+        <i class="fa-solid fa-key"></i> Mã OTP (6 chữ số)
+      </label>
+      <div class="otp-input-container">
+        <input type="text" id="otp-input" name="otp" class="otp-input" placeholder="000000" maxlength="6">
+        <button type="button" id="verify-otp-btn" class="verify-otp-btn">
+          <i class="fa-solid fa-check"></i> Xác thực OTP
         </button>
-    </form>
+        <button type="button" id="resend-otp-btn" class="resend-btn" style="display: none;">
+          <i class="fa-solid fa-redo"></i> Gửi lại
+        </button>
+      </div>
+      <div class="otp-timer">
+        <i class="fa-solid fa-clock"></i>
+        OTP có hiệu lực trong: <span id="countdown" class="countdown">05:00</span>
+      </div>
+    </div>
+
+    <!-- OTP Status Messages -->
+    <div id="otp-message" class="otp-message" style="display: none;"></div>
+
+    <!-- 3. Nút Gửi OTP -->
+    <button type="button" id="send-otp-btn" class="otp-button">
+      <i class="fa-solid fa-envelope"></i> Gửi mã OTP
+    </button>
+
+    <!-- 4. Card section: chỉ hiển thị sau khi OTP đã xác thực -->
+    <div id="card-section" style="display: none;">
+      <div class="form-group">
+        <label for="card-holder-name">
+          <i class="fa-solid fa-user"></i> Tên chủ thẻ
+        </label>
+        <input type="text" id="card-holder-name" class="email-input" placeholder="VD: NGUYEN VAN A" required>
+      </div>
+
+      <div class="form-group">
+        <label>
+          <i class="fa-solid fa-credit-card"></i> Thông tin thẻ (Được bảo mật bởi PSP)
+        </label>
+        <div id="card-element"></div>
+      </div>
+
+      <div id="payment-errors" class="payment-errors" style="display: none;"></div>
+      <div id="loading-message" class="loading-message" style="display: none;">Đang xử lý giao dịch... Vui lòng đợi.</div>
+
+      <!-- Nút Thanh Toán -->
+      <button id="submit-button" class="pay-button" type="submit" disabled>
+        <i class="fa-solid fa-lock"></i> Vui lòng xác thực OTP trước khi thanh toán
+      </button>
+    </div>
+  </form>
 </div>
 
-<!-- 3. JavaScript Logic for Tokenization & API Call -->
 <script>
-    const STRIPE_PUBLIC_KEY = "{{ stripe_public_key }}";
-    const stripe = Stripe(STRIPE_PUBLIC_KEY);
-    const elements = stripe.elements();
-    
-    // Cấu hình Hosted Fields
-    const cardElement = elements.create('card', {
-        style: {
-            base: {
-                fontSize: '16px',
-                color: '#424770',
-                '::placeholder': {
-                    color: '#aab7c4',
-                },
-            },
-            invalid: {
-                color: '#fa755a',
-                iconColor: '#fa755a'
-            }
-        }
-    });
-    
-    // Chèn Hosted Fields vào DOM
-    cardElement.mount('#card-element');
-    
-    // Lấy user_id từ localStorage và điền vào form (nếu đã đăng nhập)
-    const userId = localStorage.getItem('user_id');
-    if (userId) {
-        document.getElementById('user-id-input').value = userId;
-        console.log('✅ User ID loaded from localStorage:', userId);
-    } else {
-        console.log('⚠️ No user_id in localStorage - user may not be logged in');
+// ========= Stripe setup =========
+const STRIPE_PUBLIC_KEY = "{{ stripe_public_key }}";
+const stripe = Stripe(STRIPE_PUBLIC_KEY);
+const elements = stripe.elements();
+
+const cardElement = elements.create('card', {
+  style: {
+    base: {
+      fontSize: '16px',
+      color: '#1e293b',
+      fontFamily: '"Inter", sans-serif',
+      '::placeholder': {
+        color: '#94a3b8',
+      }
+    },
+    invalid: {
+      color: '#ef4444',
+      iconColor: '#ef4444'
+    },
+    complete: {
+      color: '#10b981',
+      iconColor: '#10b981'
     }
-    
-    const form = document.getElementById('payment-form');
-    const submitButton = document.getElementById('submit-button');
-    const errorDiv = document.getElementById('payment-errors');
-    const loadingDiv = document.getElementById('loading-message');
-    const cardHolderName = document.getElementById('card-holder-name');
-    
-    form.addEventListener('submit', async (event) => {
-        event.preventDefault();
-        
-        submitButton.disabled = true;
-        errorDiv.textContent = '';
-        loadingDiv.style.display = 'block';
+  }
+});
 
-        // 1. **Tokenization (Bước quan trọng nhất cho PCI-DSS)**
-        // Gửi thông tin thẻ từ Hosted Fields trực tiếp đến PSP (Stripe)
-        const { token, error } = await stripe.createToken(cardElement, {
-            name: cardHolderName.value,
-        });
+let cardMounted = false;
+function mountCardElement() {
+  if (!cardMounted) {
+    cardElement.mount('#card-element');
+    cardMounted = true;
+  }
+}
 
-        if (error) {
-            // Xử lý lỗi Tokenization (ví dụ: thẻ không hợp lệ)
-            errorDiv.textContent = error.message;
-            submitButton.disabled = false;
-            loadingDiv.style.display = 'none';
-            return;
-        }
+// ========= DOM & state =========
+const form = document.getElementById('payment-form');
+const submitButton = document.getElementById('submit-button');
+const errorDiv = document.getElementById('payment-errors');
+const loadingDiv = document.getElementById('loading-message');
+const cardHolderName = document.getElementById('card-holder-name');
+const cardSection = document.getElementById('card-section');
 
-        // 2. **Chống Replay Attack & Device Binding (Tuần 7-8)**
-        // Tạo Nonce (số ngẫu nhiên dùng một lần) cho mỗi giao dịch
-        const nonce = crypto.randomUUID(); 
-        document.getElementById('nonce-input').value = nonce;
-        
-        // Giả lập Device Fingerprint (sau này có thể dùng thư viện phức tạp hơn)
-        const deviceFingerprint = btoa(navigator.userAgent);
-        document.getElementById('device-fingerprint-input').value = deviceFingerprint;
+// user_id từ localStorage
+const userId = localStorage.getItem('user_id');
+if (userId) {
+  document.getElementById('user-id-input').value = userId;
+  console.log('✅ User ID loaded from localStorage:', userId);
+} else {
+  console.log('⚠️ No user_id in localStorage - user may not be logged in');
+}
 
+// ========= OTP logic =========
+let otpCountdown = null;
+let otpTimeLeft = 300; // 5 minutes
+let otpVerified = false;
 
-        // 3. **Gửi Token và Nonce về API Gateway (Backend)**
-        // Backend chỉ nhận Payment Token, không nhận PAN
-        document.getElementById('payment-token-input').value = token.id;
+// Order info
+const orderId = "{{ order.id }}";
+const orderAmount = {{ order.amount | int }};
+const orderCurrency = "{{ order.currency }}";
 
-        // Tiến hành gửi Form đến Backend (FastAPI route: /create_payment)
-        const formData = new FormData(form);
-        
-        // Lấy JWT token từ localStorage (nếu user đã login)
-        const accessToken = localStorage.getItem('access_token');
-        const headers = {};
-        if (accessToken) {
-            headers['Authorization'] = `Bearer ${accessToken}`;
-        }
-        
-        try {
-            const response = await fetch('/payment_service/create_payment', {
-                method: 'POST',
-                headers: headers,
-                body: formData
-            });
+// OTP DOM
+const emailInput = document.getElementById('email-input');
+const otpInput = document.getElementById('otp-input');
+const otpGroup = document.getElementById('otp-group');
+const sendOtpBtn = document.getElementById('send-otp-btn');
+const resendOtpBtn = document.getElementById('resend-otp-btn');
+const verifyOtpBtn = document.getElementById('verify-otp-btn');
+const countdownSpan = document.getElementById('countdown');
 
-            if (response.ok) {
-                const html = await response.text();
-                document.documentElement.innerHTML = html; // Load trang thành công
-            } else {
-                const errorHtml = await response.text();
-                errorDiv.textContent = 'Giao dịch thất bại: Lỗi từ API Gateway';
-                console.error("API Error:", errorHtml);
-                submitButton.disabled = false;
-                loadingDiv.style.display = 'none';
-            }
-        } catch (err) {
-            errorDiv.textContent = 'Lỗi kết nối mạng hoặc máy chủ.';
-            submitButton.disabled = false;
-            loadingDiv.style.display = 'none';
-        }
+// Show/hide OTP message
+function showOTPMessage(message, type) {
+  const messageDiv = document.getElementById('otp-message');
+  messageDiv.innerHTML = `<i class="fa-solid ${type === 'success' ? 'fa-circle-check' : 'fa-circle-exclamation'}"></i> ${message}`;
+  messageDiv.className = `otp-message ${type}`;
+  messageDiv.style.display = 'flex';
+
+  if (type === 'success') {
+    setTimeout(() => hideOTPMessage(), 5000);
+  }
+}
+
+function hideOTPMessage() {
+  const messageDiv = document.getElementById('otp-message');
+  messageDiv.style.display = 'none';
+}
+
+// Confetti
+function createConfetti(button) {
+  const colors = ['#667eea', '#764ba2', '#10b981', '#f59e0b', '#ef4444', '#06b6d4'];
+  const particleCount = 30;
+
+  for (let i = 0; i < particleCount; i++) {
+    const particle = document.createElement('div');
+    particle.className = 'confetti-particle';
+    particle.style.background = colors[Math.floor(Math.random() * colors.length)];
+    particle.style.left = `${50 + (Math.random() - 0.5) * 100}%`;
+    particle.style.animationDelay = `${Math.random() * 0.3}s`;
+    particle.style.animationDuration = `${0.8 + Math.random() * 0.4}s`;
+
+    button.appendChild(particle);
+
+    setTimeout(() => {
+      particle.remove();
+    }, 1500);
+  }
+}
+
+// Countdown
+function updateCountdown() {
+  const minutes = Math.floor(otpTimeLeft / 60);
+  const seconds = otpTimeLeft % 60;
+  const timeString = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+
+  countdownSpan.textContent = timeString;
+  countdownSpan.className = 'countdown';
+
+  if (otpTimeLeft <= 120 && otpTimeLeft > 0) {
+    countdownSpan.classList.add('warning');
+  }
+  if (otpTimeLeft <= 0) {
+    countdownSpan.classList.add('expired');
+  }
+}
+
+function startCountdown() {
+  otpTimeLeft = 300;
+  updateCountdown();
+
+  if (otpCountdown) clearInterval(otpCountdown);
+  otpCountdown = setInterval(() => {
+    otpTimeLeft--;
+    updateCountdown();
+
+    if (otpTimeLeft <= 0) {
+      clearInterval(otpCountdown);
+      showOTPMessage('⏰ OTP đã hết hạn. Vui lòng gửi lại!', 'error');
+      resendOtpBtn.style.display = 'inline-block';
+    }
+  }, 1000);
+}
+
+function resetOTPForm() {
+  if (otpCountdown) clearInterval(otpCountdown);
+  otpTimeLeft = 300;
+  countdownSpan.textContent = '05:00';
+  countdownSpan.className = 'countdown';
+  otpInput.value = '';
+  otpVerified = false;
+}
+
+// Gửi OTP
+async function sendOTP() {
+  const email = emailInput.value.trim();
+  if (!email) {
+    showOTPMessage('Vui lòng nhập email!', 'error');
+    emailInput.focus();
+    emailInput.classList.add('error');
+    setTimeout(() => emailInput.classList.remove('error'), 2000);
+    return;
+  }
+
+  if (!email.includes('@')) {
+    showOTPMessage('Email không hợp lệ!', 'error');
+    emailInput.focus();
+    emailInput.classList.add('error');
+    setTimeout(() => emailInput.classList.remove('error'), 2000);
+    return;
+  }
+
+  hideOTPMessage();
+  resetOTPForm();
+
+  sendOtpBtn.disabled = true;
+  sendOtpBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang gửi...';
+
+  try {
+    const formData = new FormData();
+    formData.append('email', email);
+    formData.append('amount', orderAmount);
+    formData.append('currency', orderCurrency.toLowerCase());
+    formData.append('order_id', orderId);
+
+    const response = await fetch('/payment_service/request_otp', {
+      method: 'POST',
+      body: formData
     });
+
+    const data = await response.json();
+
+    if (response.ok && data.success !== false) {
+      sendOtpBtn.classList.add('success');
+      sendOtpBtn.innerHTML = '<i class="fa-solid fa-check-circle"></i> Đã gửi OTP';
+      createConfetti(sendOtpBtn);
+
+      showOTPMessage('✅ OTP đã được gửi đến email của bạn!', 'success');
+
+      // Hiện OTP group
+      otpGroup.style.display = 'block';
+      otpInput.focus();
+
+      // Sau 30s mới cho hiện nút Gửi lại
+      resendOtpBtn.style.display = 'none';
+      setTimeout(() => {
+        resendOtpBtn.style.display = 'inline-block';
+      }, 30000);
+
+      startCountdown();
+    } else {
+      const errorMsg = data.error || data.detail || 'Không thể gửi OTP';
+      showOTPMessage('❌ ' + errorMsg, 'error');
+    }
+  } catch (err) {
+    console.error('OTP Error:', err);
+    showOTPMessage('❌ Lỗi kết nối. Vui lòng thử lại!', 'error');
+  } finally {
+    setTimeout(() => {
+      sendOtpBtn.disabled = false;
+      sendOtpBtn.classList.remove('success');
+      sendOtpBtn.innerHTML = '<i class="fa-solid fa-envelope"></i> Gửi mã OTP';
+    }, 1000);
+  }
+}
+
+// Xác thực OTP
+async function verifyOTP() {
+  const email = emailInput.value.trim();
+  const otp = otpInput.value.trim();
+
+  if (otpGroup.style.display === 'none') {
+    showOTPMessage('⚠️ Vui lòng gửi mã OTP trước!', 'error');
+    return;
+  }
+
+  if (!otp || otp.length !== 6) {
+    showOTPMessage('❌ Vui lòng nhập mã OTP 6 chữ số!', 'error');
+    otpInput.focus();
+    otpInput.classList.add('error');
+    setTimeout(() => otpInput.classList.remove('error'), 2000);
+    return;
+  }
+
+  verifyOtpBtn.disabled = true;
+  verifyOtpBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang xác thực...';
+
+  try {
+    const formData = new FormData();
+    formData.append('email', email);
+    formData.append('otp', otp);
+    formData.append('order_id', orderId);
+    formData.append('amount', orderAmount);
+    formData.append('currency', orderCurrency.toLowerCase());
+
+    const response = await fetch('/payment_service/verify_otp', {
+      method: 'POST',
+      body: formData
+    });
+
+    const data = await response.json();
+
+    if (response.ok && data.success !== false) {
+      otpVerified = true;
+      if (otpCountdown) clearInterval(otpCountdown);
+      countdownSpan.textContent = 'ĐÃ XÁC THỰC';
+      countdownSpan.className = 'countdown';
+
+      showOTPMessage('✅ OTP chính xác. Bạn có thể nhập thông tin thẻ và thanh toán.', 'success');
+
+      // Khoá email & OTP để tránh đổi lại
+      emailInput.readOnly = true;
+      otpInput.readOnly = true;
+
+      sendOtpBtn.style.display = 'none';
+      resendOtpBtn.style.display = 'none';
+      verifyOtpBtn.style.display = 'none';
+
+      // Hiện phần thẻ
+      cardSection.style.display = 'block';
+      mountCardElement();
+      cardHolderName.focus();
+
+      // Enable nút thanh toán
+      submitButton.disabled = false;
+      submitButton.innerHTML = '<i class="fa-solid fa-shield-check"></i> Thanh Toán ' +
+        orderAmount.toLocaleString('vi-VN') + ' VND';
+    } else {
+      otpVerified = false;
+      const errorMsg = data.error || data.detail || 'Mã OTP không chính xác. Vui lòng thử lại hoặc gửi lại mã mới.';
+      showOTPMessage('❌ ' + errorMsg, 'error');
+      otpInput.classList.add('error');
+      setTimeout(() => otpInput.classList.remove('error'), 2000);
+
+      // Cho phép gửi lại
+      resendOtpBtn.style.display = 'inline-block';
+    }
+  } catch (err) {
+    console.error('Verify OTP Error:', err);
+    showOTPMessage('❌ Lỗi kết nối khi xác thực OTP. Vui lòng thử lại!', 'error');
+  } finally {
+    verifyOtpBtn.disabled = false;
+    verifyOtpBtn.innerHTML = '<i class="fa-solid fa-check"></i> Xác thực OTP';
+  }
+}
+
+// Event listeners OTP
+sendOtpBtn.addEventListener('click', sendOTP);
+resendOtpBtn.addEventListener('click', sendOTP);
+verifyOtpBtn.addEventListener('click', verifyOTP);
+
+// Auto-format OTP input
+otpInput.addEventListener('input', function () {
+  this.value = this.value.replace(/\D/g, '');
+  if (this.value.length === 6) {
+    this.classList.add('success');
+    setTimeout(() => this.classList.remove('success'), 500);
+  } else {
+    this.classList.remove('success');
+  }
+});
+
+// ========= Payment submit =========
+form.addEventListener('submit', async function (e) {
+  e.preventDefault();
+
+  if (!otpVerified) {
+    showOTPMessage('⚠️ Bạn cần xác thực OTP thành công trước khi thanh toán.', 'error');
+    return;
+  }
+
+  errorDiv.style.display = 'none';
+  errorDiv.textContent = '';
+  loadingDiv.style.display = 'flex';
+  submitButton.disabled = true;
+  submitButton.classList.add('processing');
+
+  // Tokenization with Stripe
+  const { token, error } = await stripe.createToken(cardElement, {
+    name: cardHolderName.value,
+  });
+
+  if (error) {
+    errorDiv.textContent = error.message;
+    errorDiv.style.display = 'block';
+    loadingDiv.style.display = 'none';
+    submitButton.disabled = false;
+    submitButton.classList.remove('processing');
+    return;
+  }
+
+  // Nonce & Device fingerprint
+  const nonce = crypto.randomUUID();
+  document.getElementById('nonce-input').value = nonce;
+
+  const deviceFingerprint = btoa(navigator.userAgent);
+  document.getElementById('device-fingerprint-input').value = deviceFingerprint;
+
+  // Payment token
+  document.getElementById('payment-token-input').value = token.id;
+
+  const formData = new FormData(form);
+
+  const accessToken = localStorage.getItem('access_token');
+  const headers = {};
+  if (accessToken) {
+    headers['Authorization'] = `Bearer ${accessToken}`;
+  }
+
+  try {
+    const response = await fetch('/payment_service/create_payment', {
+      method: 'POST',
+      headers: headers,
+      body: formData
+    });
+
+    if (response.ok) {
+      const html = await response.text();
+      document.documentElement.innerHTML = html;
+    } else {
+      const errorHtml = await response.text();
+      console.error("API Error:", errorHtml);
+      errorDiv.textContent = 'Giao dịch thất bại: Lỗi từ API Gateway';
+      errorDiv.style.display = 'block';
+      loadingDiv.style.display = 'none';
+      submitButton.disabled = false;
+      submitButton.classList.remove('processing');
+    }
+  } catch (err) {
+    console.error(err);
+    errorDiv.textContent = 'Lỗi kết nối mạng hoặc máy chủ.';
+    errorDiv.style.display = 'block';
+    loadingDiv.style.display = 'none';
+    submitButton.disabled = false;
+    submitButton.classList.remove('processing');
+  }
+});
 </script>
 
 </body>

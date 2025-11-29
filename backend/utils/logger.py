@@ -1,4 +1,3 @@
-from argparse import FileType
 import logging
 import logging.handlers
 import json
@@ -7,13 +6,12 @@ import re
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any, Optional
-from xml.sax import handler
 
 
 # Đường dẫn thư mục logs (tự động tạo nếu chưa có)
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 LOG_DIR = BASE_DIR / "logs"
-LOG_DIR.mkdir(exist_ok=True)
+LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 # Log levels
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")

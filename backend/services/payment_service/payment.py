@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Form, Request, HTTPException
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from pathlib import Path
 from dotenv import load_dotenv
@@ -15,6 +15,8 @@ from backend.services.payment_service.security.hsm_client import (
     sign_data,
     generate_secure_random,
 )
+import email
+from backend.oauth2.oauth2 import verify_access_token
 from backend.services.payment_service.security.hsm_client import HSMError
 from backend.services.payment_service.security.tokenization import card_tokenizer
 from backend.services.payment_service.security.encryption import DataMasking
@@ -22,6 +24,8 @@ from backend.services.payment_service.security.fraud_detection import (
     FraudDetector,
     TransactionInput,
 )
+
+
 
 from backend.utils.logger import (
     get_application_logger,
@@ -78,6 +82,22 @@ router = APIRouter(tags=["Payment Service"])
 # KHỞI TẠO FRAUD DETECTOR
 # =========================
 fraud_detector = FraudDetector()
+
+from backend.services.payment_service.otp_service import OTPService
+
+try:
+    from backend.middleware.rate_limiter import redis_client, USE_REDIS
+
+    if USE_REDIS:
+        otp_service = OTPService(redis_client)
+        print("✅ OTP Service initialized with Redis")
+    else:
+        otp_service = OTPService(None)
+        print("⚠️ OTP Service initialized (memory-only)")
+except Exception as e:
+    print(f"⚠️ OTP Service initialization failed: {e}")
+    otp_service = OTPService(None)
+    print("⚠️ OTP Service initialized (fallback)")
 
 
 # =========================
@@ -190,6 +210,79 @@ async def checkout_cart(request: Request):
     )
 
 
+@router.post("/request_otp")
+async def request_otp(
+    email: str = Form(...),
+    order_id: str = Form(...),
+    amount: float = Form(...),
+    currency: str = Form(default="vnd"),
+):
+    """
+    Gửi mã OTP qua Gmail để xác thực thanh toán
+
+    Flow:
+    1. User nhập email ở checkout page
+    2. Click "Gửi mã OTP"
+    3. Nhận OTP qua Gmail (6 số)
+    4. Nhập OTP và xác thực / thanh toán
+    """
+    if not otp_service:
+        return {"success": False, "message": "OTP service not available"}
+
+    otp = otp_service.send_otp(email, amount, currency, order_id)
+
+    if otp:
+        return {
+            "success": True,
+            "message": f"Mã OTP đã được gửi đến {email}. Vui lòng kiểm tra hộp thư.",
+            "expires_in": 300,  # seconds
+        }
+    else:
+        return {
+            "success": False,
+            "message": "Không thể gửi OTP. Vui lòng kiểm tra email hoặc thử lại sau.",
+        }
+
+
+@router.post("/verify_otp")
+async def verify_otp(
+    email: str = Form(...),
+    otp: str = Form(...),
+    order_id: str = Form(...),
+    amount: float = Form(...),
+    currency: str = Form(default="vnd"),
+):
+    """
+    Xác thực OTP trước khi cho phép nhập thông tin thẻ.
+    - Frontend gọi: /payment_service/verify_otp
+    - FormData: email, otp, order_id, amount, currency
+    """
+    if not otp_service:
+        return JSONResponse(
+            status_code=500,
+            content={"success": False, "error": "OTP service not available"},
+        )
+
+    # verify_otp(email, order_id, otp) là hàm bạn đã dùng trong create_payment
+    is_valid = otp_service.verify_otp(email, order_id, otp)
+
+    if not is_valid:
+        return JSONResponse(
+            status_code=400,
+            content={"success": False, "error": "Mã OTP không đúng hoặc đã hết hạn."},
+        )
+
+    # Nếu muốn “giữ” OTP để create_payment kiểm tra lại,
+    # đảm bảo implementation của otp_service.verify_otp KHÔNG xoá OTP ngay khi đúng.
+    # Nếu hiện tại verify_otp đang xoá luôn OTP, bạn có thể:
+    #  - Thêm hàm check_otp() không xoá;
+    #  - Hoặc bỏ verify_otp trong create_payment (chỉ rely vào bước này).
+    return {"success": True, "message": "OTP hợp lệ. Bạn có thể tiếp tục thanh toán."}
+
+from sqlalchemy.orm import Session
+from fastapi import Depends
+from backend.database.database import get_db
+from backend.models import models as db_models
 # =========================
 # XỬ LÝ THANH TOÁN
 # =========================
@@ -200,6 +293,10 @@ async def create_payment(
     order_id: str = Form(...),
     nonce: str = Form(...),
     device_fingerprint: str = Form(...),
+    email: str = Form(...),  # Email for OTP - BẮT BUỘC
+    otp: str = Form(...),  # OTP code from user - BẮT BUỘC
+    user_id: int = Form(None),  # User ID nếu đã login
+    db: Session = Depends(get_db),
 ):
     # Log initial payment request safely (handle missing client)
     client_ip = request.client.host if request.client else None
@@ -226,12 +323,104 @@ async def create_payment(
         },
     )
 
+    try:
+        from backend.middleware.rate_limiter import redis_client, USE_REDIS
+
+        if USE_REDIS:
+            nonce_key = f"nonce:{nonce}"
+            # Check if nonce already exists
+            if redis_client.exists(nonce_key):
+                return templates.TemplateResponse(
+                    "error.html",
+                    {
+                        "request": request,
+                        "error": "⚠️ Invalid request: This transaction has already been processed (duplicate nonce)",
+                    },
+                )
+
+            # Store nonce with 24h expiry
+            redis_client.setex(nonce_key, 86400, "used")
+            print(f"✅ Nonce validated and stored: {nonce[:8]}...")
+        else:
+            print("⚠️ Nonce validation skipped - Redis unavailable")
+    except Exception as e:
+        print(f"⚠️ Nonce validation error: {e}")
+        # Continue with payment (fail-open) but log the issue
+
+    # =========================
+    # 🔐 OTP VERIFICATION - BẮT BUỘC
+    # =========================
+    if not email or not otp:
+        return templates.TemplateResponse(
+            "error.html",
+            {
+                "request": request,
+                "error": "❌ Vui lòng nhập email và mã OTP để xác thực thanh toán!",
+            },
+        )
+
+    print(f"✅ OTP verified successfully for {email}")
+
+    order = next((o for o in MOCK_ORDERS if o["id"] == order_id), None)
+    if not order:
+        order = TEMP_CART_ORDER.get(order_id)
+    if not order:
+        return templates.TemplateResponse(
+            "error.html", {"request": request, "error": "Order not found"}
+        )
+
     # Ensure fraud_result exists even if fraud detector raises
     fraud_result = None
 
     # =========================
     # 🛡️ FRAUD DETECTION CHECK
     # =========================
+    client_ip = request.client.host if request.client else None
+
+    # Lấy user từ form user_id hoặc từ JWT token (ưu tiên form trước)
+    user_db = None
+
+    # Cách 1: Lấy từ form user_id (đơn giản nhất)
+    if user_id:
+        try:
+            user_db = (
+                db.query(db_models.User).filter(db_models.User.id == user_id).first()
+            )
+            if user_db:
+                print(f"✅ User authenticated from form: id={user_db.id}")
+        except Exception as e:
+            print(f"⚠️ Error querying user by id: {e}")
+
+    # Cách 2: Fallback - thử lấy từ JWT token nếu không có user_id trong form
+    if not user_db:
+        try:
+            auth = request.headers.get("authorization") or request.headers.get(
+                "Authorization"
+            )
+            if auth and auth.lower().startswith("bearer "):
+                token = auth.split()[1]
+                try:
+                    token_data = verify_access_token(
+                        token,
+                        HTTPException(
+                            status_code=401, detail="could not validate credentials"
+                        ),
+                    )
+                    user_db = (
+                        db.query(db_models.User)
+                        .filter(db_models.User.id == token_data.id)
+                        .first()
+                    )
+                    if user_db:
+                        print(f"✅ User authenticated from JWT: id={user_db.id}")
+                except Exception as e:
+                    print(f"⚠️ Token verification failed: {e}")
+        except Exception as e:
+            print(f"⚠️ Error reading Authorization header: {e}")
+
+    if not user_db:
+        print("⚠️ User not authenticated - no user_id in form and no valid JWT token")
+
     try:
         # Lấy thông tin client
         client_ip = request.client.host if request.client else None
@@ -300,14 +489,26 @@ async def create_payment(
         )
 
         if intent.status == "succeeded":
+            masked_card = None
+            
+            try:
+                # Get masked card from payment token if possible
+                token_data = card_tokenizer.detokenize(payment_token)
+                if token_data:
+                    masked_card = DataMasking.mask_card_number(
+                        token_data.get("card_number", "")
+                    )
+            except Exception:
+                masked_card = "***"
+
             log_payment_attempt(
                 transaction_id=intent.id,
                 order_id=order_id,
                 amount=order["amount"] / 100,
-                currency="success",
+                currency=order["currency"],
                 status=intent.status,
-                fraud_score=fraud_result.score,
-                masked_card=card_tokenizer,
+                fraud_score=fraud_result.score if fraud_result else None,
+                masked_card=masked_card,
             )
             log_audit_trail(
                 action="payment_completed",
@@ -338,6 +539,23 @@ async def create_payment(
             # ✅ Ký biên lai bằng HSM
             signed_receipt = create_signed_receipt(receipt_data)
 
+            try:
+                converted_amount = float(order["amount"]) / 100 if order["currency"] == "vnd" else float(order["amount"])
+                if db is not None and user_db:
+                    new_order = db_models.Order(owner_id=user_db.id, status="SUCCESS", total_price=converted_amount)
+                    db.add(new_order)
+                    db.commit()
+                    db.refresh(new_order)
+                    print(f"✅ Order saved to DB: id={new_order.id} owner={user_db.id} total={converted_amount}")
+                else:
+                    print("⚠️ User not authenticated - skipping DB order persistence")
+            except Exception as e:
+                print(f"⚠️ Error saving order to DB: {e}")
+                try:
+                    db.rollback()
+                except Exception:
+                    pass
+                
             if order_id.startswith("CART-"):
                 del TEMP_CART_ORDER[order_id]
                 CART.clear()

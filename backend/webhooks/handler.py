@@ -1,8 +1,9 @@
 from backend.database.database import SessionLocal
 from backend.models.models import Order
-from backend.utils.logger import get_transaction_logger, log_audit_trail
+from backend.utils.logger import get_transaction_logger, log_audit_trail, get_error_logger
 
 logger = get_transaction_logger()
+error_logger = get_error_logger()
 
 def handle_payment_success(payment_intent):
     order_id = payment_intent['metadata'].get('order_id')
@@ -46,9 +47,13 @@ def handle_unhandle_event(event_type):
 def dispatch_event(event):
     
     #dieu phoi su kien da duoc xac thuc den ham xu li
-    event_type = event['type']
-    event_data = event['data']['object']
-    
+    try:
+        event_type = event.get('type')
+        event_data = event.get('data', {}).get('object')
+    except Exception as e:
+        error_logger.error(f"Error parsing event: {str(e)}", exc_info=True)
+        return {"status": "error", "message": str(e)}
+        
     if event_type == 'payment_intent.succeeded':
         handle_payment_success(event_data)
         
