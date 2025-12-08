@@ -147,4 +147,10 @@ python -m uvicorn backend.main:app --reload
 # tao certificate và key
 openssl req -x509 -newkey rsa:2048 -keyout key.pem -out cert.pem -days 365 -nodes
 
-uvicorn backend.main:app --ssl-keyfile="backend/key.pem" --ssl-certfile="backend/cert.pem"
+uvicorn backend.main:app --ssl-keyfile="backend/ec-private-key.pem" --ssl-certfile="backend/certificate.crt"
+
+echo 127.0.0.1 secureshop.kesug.com >> C:\Windows\System32\drivers\etc\hosts
+
+type C:\Windows\System32\drivers\etc\hosts
+
+https://secureshop.kesug.com:8000/

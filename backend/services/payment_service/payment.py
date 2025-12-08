@@ -118,6 +118,22 @@ def create_signed_receipt(transaction_data: dict) -> dict:
 
 
 # =========================
+# ERROR CODES MAPPING
+# =========================
+ERROR_CODES = {
+    "CARD_DECLINED": "E001",           # Thẻ bị từ chối
+    "INSUFFICIENT_FUNDS": "E002",      # Không đủ tiền
+    "INVALID_CARD": "E003",            # Thẻ không hợp lệ
+    "EXPIRED_CARD": "E004",            # Thẻ đã hết hạn
+    "INVALID_CVV": "E005",             # CVV không hợp lệ
+    "INVALID_REQUEST": "E006",         # Yêu cầu không hợp lệ
+    "STRIPE_ERROR": "E007",            # Lỗi Stripe
+    "INTERNAL_ERROR": "E008",          # Lỗi server nội bộ
+    "PAYMENT_INCOMPLETE": "E009",      # Thanh toán không hoàn thành
+    "DUPLICATE_TRANSACTION": "E010",   # Giao dịch trùng lặp
+}
+
+# =========================
 # API ROUTES
 # =========================
 @router.get("/healthz")
@@ -328,24 +344,27 @@ async def create_payment(
 
         if USE_REDIS:
             nonce_key = f"nonce:{nonce}"
-            # Check if nonce already exists
-            if redis_client.exists(nonce_key):
+            
+            # SỬA: Dùng set với tham số nx=True (Atomic)
+            # Lệnh này trả về True nếu set thành công (key chưa có)
+            # Trả về False nếu set thất bại (key đã có)
+            is_new_nonce = redis_client.set(nonce_key, "used", ex=86400, nx=True)
+            
+            if not is_new_nonce:
+                # Nếu trả về False nghĩa là đã có người khác chiếm trước rồi
                 return templates.TemplateResponse(
                     "error.html",
                     {
                         "request": request,
-                        "error": "⚠️ Invalid request: This transaction has already been processed (duplicate nonce)",
+                        "error": "⚠️ Giao dịch bị trùng lặp (Race Condition blocked)!",
                     },
                 )
-
-            # Store nonce with 24h expiry
-            redis_client.setex(nonce_key, 86400, "used")
-            print(f"✅ Nonce validated and stored: {nonce[:8]}...")
+             
+            print(f"✅ Nonce validated and stored atomically: {nonce[:8]}...")
         else:
             print("⚠️ Nonce validation skipped - Redis unavailable")
     except Exception as e:
         print(f"⚠️ Nonce validation error: {e}")
-        # Continue with payment (fail-open) but log the issue
 
     # =========================
     # 🔐 OTP VERIFICATION - BẮT BUỘC
@@ -476,6 +495,55 @@ async def create_payment(
         traceback.print_exc()
 
     # =========================
+    # RACE CONDITION PREVENTION - DB LOCKING
+    # =========================
+    try:
+        # 1. Tìm đơn hàng trong DB với lock (for update)
+        current_order_db = db.query(db_models.Order).filter(
+            db_models.Order.order_id == order_id
+        ).with_for_update().first()
+
+        # 2. Nếu đơn hàng chưa tồn tại, tạo nháp với status PENDING
+        if not current_order_db:
+            owner_id = user_db.id if user_db else None 
+            
+            current_order_db = db_models.Order(
+                order_id=order_id,
+                owner_id=owner_id,
+                status="PENDING",
+                total_price=float(order["amount"])
+            )
+            db.add(current_order_db)
+            db.flush()  # Giữ chỗ trong DB nhưng chưa commit
+        
+        # 3. Kiểm tra trạng thái - nếu đã SUCCESS thì chặn
+        if current_order_db.status == "SUCCESS":
+            print(f"🛑 Race Condition Detected! Order {order_id} already paid.")
+            db.rollback()
+            return templates.TemplateResponse(
+                "error.html",
+                {
+                    "request": request,
+                    "error": "Đơn hàng này đã được thanh toán thành công!",
+                    "error_code": ERROR_CODES["DUPLICATE_TRANSACTION"],
+                },
+                status_code=402,
+            )
+
+    except Exception as e:
+        print(f"⚠️ Error during DB Locking: {e}")
+        db.rollback()
+        return templates.TemplateResponse(
+            "error.html",
+            {
+                "request": request,
+                "error": "Database Error",
+                "error_code": ERROR_CODES["INTERNAL_ERROR"],
+            },
+            status_code=500,
+        )
+
+    # =========================
     # XỬ LÝ THANH TOÁN VỚI STRIPE
     # =========================
     try:
@@ -541,20 +609,17 @@ async def create_payment(
 
             try:
                 converted_amount = float(order["amount"]) / 100 if order["currency"] == "vnd" else float(order["amount"])
-                if db is not None and user_db:
-                    new_order = db_models.Order(owner_id=user_db.id, status="SUCCESS", total_price=converted_amount)
-                    db.add(new_order)
-                    db.commit()
-                    db.refresh(new_order)
-                    print(f"✅ Order saved to DB: id={new_order.id} owner={user_db.id} total={converted_amount}")
-                else:
-                    print("⚠️ User not authenticated - skipping DB order persistence")
+                
+                # Update existing order instead of creating new one
+                current_order_db.status = "SUCCESS"
+                current_order_db.total_price = converted_amount
+                db.commit()
+                db.refresh(current_order_db)
+                print(f"✅ Order updated in DB: id={current_order_db.id} owner={current_order_db.owner_id} total={converted_amount}")
+                
             except Exception as e:
-                print(f"⚠️ Error saving order to DB: {e}")
-                try:
-                    db.rollback()
-                except Exception:
-                    pass
+                print(f"⚠️ Error updating order in DB: {e}")
+                db.rollback()
                 
             if order_id.startswith("CART-"):
                 del TEMP_CART_ORDER[order_id]
@@ -568,41 +633,74 @@ async def create_payment(
                     "order": order,
                     "signed_receipt": signed_receipt,
                 },
+                status_code=200,
             )
 
         else:
-
             logger.warning(
                 f"Payment incomplete: {intent.status}", extra={"order id": order_id}
             )
+            db.rollback()
 
             return templates.TemplateResponse(
                 "error.html",
                 {
                     "request": request,
                     "error": f"Payment requires confirmation. Status: {intent.status}",
+                    "error_code": ERROR_CODES["PAYMENT_INCOMPLETE"],
                 },
+                status_code=402,
             )
 
     except stripe.CardError as e:
         body = e.json_body
         err = body.get("error", {})
+        error_code = err.get("code", "")
+        
+        # Map Stripe error codes to our error codes
+        if error_code == "card_declined":
+            our_error_code = ERROR_CODES["CARD_DECLINED"]
+        elif error_code == "insufficient_funds":
+            our_error_code = ERROR_CODES["INSUFFICIENT_FUNDS"]
+        elif error_code == "invalid_card":
+            our_error_code = ERROR_CODES["INVALID_CARD"]
+        elif error_code == "expired_card":
+            our_error_code = ERROR_CODES["EXPIRED_CARD"]
+        elif error_code == "incorrect_cvc":
+            our_error_code = ERROR_CODES["INVALID_CVV"]
+        else:
+            our_error_code = ERROR_CODES["CARD_DECLINED"]
+        
         logger.warning(
-            f"Card declined: {err.message}",
-            extra={"order_id": order_id, "code": err.code},
+            f"Card declined: {err.get('message')}",
+            extra={"order_id": order_id, "code": error_code},
         )
+        db.rollback()
+        
         return templates.TemplateResponse(
             "error.html",
-            {"request": request, "error": f"Payment failed: {err.get('message')}"},
+            {
+                "request": request,
+                "error": f"Payment failed: {err.get('message')}",
+                "error_code": our_error_code,
+            },
+            status_code=402,
         )
 
     except stripe.InvalidRequestError as e:
-        # Ghi log lỗi request (như lỗi URL vừa rồi) vào file errors.log
         logger.error(
             f"Stripe Invalid Request: {e}", exc_info=True, extra={"order_id": order_id}
         )
+        db.rollback()
+        
         return templates.TemplateResponse(
-            "error.html", {"request": request, "error": f"Invalid Data: {e}"}
+            "error.html",
+            {
+                "request": request,
+                "error": f"Invalid Data: {e}",
+                "error_code": ERROR_CODES["INVALID_REQUEST"],
+            },
+            status_code=400,
         )
 
     except Exception as e:
@@ -612,7 +710,14 @@ async def create_payment(
             exc_info=True,
             extra={"order_id": order_id},
         )
+        db.rollback()
+        
         return templates.TemplateResponse(
             "error.html",
-            {"request": request, "error": f"Error processing payment: {e}"},
+            {
+                "request": request,
+                "error": f"Error processing payment: {e}",
+                "error_code": ERROR_CODES["INTERNAL_ERROR"],
+            },
+            status_code=500,
         )

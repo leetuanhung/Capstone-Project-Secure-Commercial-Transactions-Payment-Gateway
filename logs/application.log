@@ -272,3 +272,44 @@
 {"timestamp": "2025-11-29T13:51:11.501764", "level": "\u001b[32mINFO\u001b[0m", "message": "Payment succeeded", "module": "logger", "function": "log_payment_attempt", "line": 263, "transaction_id": "pi_3SYoYNHxKDaqjWch0S4aWd8T", "order_id": "ORD-DC6C58F1"}
 {"timestamp": "2025-11-29T14:00:06.587241", "level": "\u001b[32mINFO\u001b[0m", "message": "Orders page accessed", "module": "order", "function": "list_orders", "line": 71}
 {"timestamp": "2025-11-29T14:00:55.396358", "level": "\u001b[32mINFO\u001b[0m", "message": "Payment succeeded", "module": "logger", "function": "log_payment_attempt", "line": 263, "transaction_id": "pi_3SYohmHxKDaqjWch0cY0TwIp", "order_id": "ORD-DC6C58F1"}
+{"timestamp": "2025-12-07T14:29:25.452546", "level": "\u001b[32mINFO\u001b[0m", "message": "Payment System starting...", "module": "main", "function": "<module>", "line": 40}
+{"timestamp": "2025-12-07T14:29:25.452546", "level": "\u001b[32mINFO\u001b[0m", "message": "Environment: development", "module": "main", "function": "<module>", "line": 41}
+{"timestamp": "2025-12-07T14:30:33.331827", "level": "\u001b[32mINFO\u001b[0m", "message": "Orders page accessed", "module": "order", "function": "list_orders", "line": 71}
+{"timestamp": "2025-12-07T14:30:34.206675", "level": "\u001b[32mINFO\u001b[0m", "message": "Orders page accessed", "module": "order", "function": "list_orders", "line": 71}
+{"timestamp": "2025-12-07T14:31:35.073945", "level": "\u001b[32mINFO\u001b[0m", "message": "Payment succeeded", "module": "logger", "function": "log_payment_attempt", "line": 263, "transaction_id": "pi_3SbizpHxKDaqjWch07FdwKRv", "order_id": "ORD-CCFF1AEA"}
+{"timestamp": "2025-12-07T14:34:34.125167", "level": "\u001b[32mINFO\u001b[0m", "message": "Payment succeeded", "module": "logger", "function": "log_payment_attempt", "line": 263, "transaction_id": "pi_3Sbj2iHxKDaqjWch1fW26b1P", "order_id": "ORD-CCFF1AEA"}
+{"timestamp": "2025-12-07T14:36:08.632960", "level": "\u001b[32mINFO\u001b[0m", "message": "Orders page accessed", "module": "order", "function": "list_orders", "line": 71}
+{"timestamp": "2025-12-07T14:37:41.492423", "level": "\u001b[32mINFO\u001b[0m", "message": "Payment succeeded", "module": "logger", "function": "log_payment_attempt", "line": 263, "transaction_id": "pi_3Sbj5kHxKDaqjWch0Avp0vUs", "order_id": "ORD-CCFF1AEA"}
+{"timestamp": "2025-12-07T14:39:29.802308", "level": "\u001b[32mINFO\u001b[0m", "message": "Orders page accessed", "module": "order", "function": "list_orders", "line": 71}
+{"timestamp": "2025-12-07T14:40:02.958689", "level": "\u001b[32mINFO\u001b[0m", "message": "Payment succeeded", "module": "logger", "function": "log_payment_attempt", "line": 263, "transaction_id": "pi_3Sbj81HxKDaqjWch0R13nG2L", "order_id": "ORD-CCFF1AEA"}
+{"timestamp": "2025-12-07T14:43:04.267399", "level": "\u001b[32mINFO\u001b[0m", "message": "Payment succeeded", "module": "logger", "function": "log_payment_attempt", "line": 263, "transaction_id": "pi_3SbjAwHxKDaqjWch0Ae9AfoI", "order_id": "ORD-CCFF1AEA"}
+{"timestamp": "2025-12-07T15:00:00.511817", "level": "\u001b[32mINFO\u001b[0m", "message": "Payment succeeded", "module": "logger", "function": "log_payment_attempt", "line": 263, "transaction_id": "pi_3SbjRLHxKDaqjWch197bhzuo", "order_id": "ORD-CCFF1AEA"}
+{"timestamp": "2025-12-07T15:16:14.019667", "level": "\u001b[32mINFO\u001b[0m", "message": "Payment System starting...", "module": "main", "function": "<module>", "line": 40}
+{"timestamp": "2025-12-07T15:16:14.038383", "level": "\u001b[32mINFO\u001b[0m", "message": "Environment: development", "module": "main", "function": "<module>", "line": 41}
+{"timestamp": "2025-12-07T15:17:02.561441", "level": "\u001b[32mINFO\u001b[0m", "message": "Orders page accessed", "module": "order", "function": "list_orders", "line": 71}
+{"timestamp": "2025-12-07T15:17:13.327308", "level": "\u001b[32mINFO\u001b[0m", "message": "Orders page accessed", "module": "order", "function": "list_orders", "line": 71}
+{"timestamp": "2025-12-07T15:17:16.400324", "level": "\u001b[32mINFO\u001b[0m", "message": "Orders page accessed", "module": "order", "function": "list_orders", "line": 71}
+{"timestamp": "2025-12-07T15:18:09.197269", "level": "\u001b[32mINFO\u001b[0m", "message": "Payment succeeded", "module": "logger", "function": "log_payment_attempt", "line": 263, "transaction_id": "pi_3SbjitHxKDaqjWch1QBFioFz", "order_id": "ORD-4B4E8CBE"}
+{"timestamp": "2025-12-07T15:21:46.967986", "level": "\u001b[32mINFO\u001b[0m", "message": "Payment System starting...", "module": "main", "function": "<module>", "line": 40}
+{"timestamp": "2025-12-07T15:21:46.968989", "level": "\u001b[32mINFO\u001b[0m", "message": "Environment: development", "module": "main", "function": "<module>", "line": 41}
+{"timestamp": "2025-12-07T15:22:01.779359", "level": "\u001b[32mINFO\u001b[0m", "message": "Orders page accessed", "module": "order", "function": "list_orders", "line": 71}
+{"timestamp": "2025-12-07T15:22:04.853195", "level": "\u001b[32mINFO\u001b[0m", "message": "Orders page accessed", "module": "order", "function": "list_orders", "line": 71}
+{"timestamp": "2025-12-07T15:24:14.213312", "level": "\u001b[32mINFO\u001b[0m", "message": "Payment succeeded", "module": "logger", "function": "log_payment_attempt", "line": 263, "transaction_id": "pi_3SbjomHxKDaqjWch141Sg0I6", "order_id": "ORD-9C23F629"}
+{"timestamp": "2025-12-07T15:30:00.856645", "level": "\u001b[32mINFO\u001b[0m", "message": "Payment System starting...", "module": "main", "function": "<module>", "line": 40}
+{"timestamp": "2025-12-07T15:30:00.858636", "level": "\u001b[32mINFO\u001b[0m", "message": "Environment: development", "module": "main", "function": "<module>", "line": 41}
+{"timestamp": "2025-12-07T15:30:52.415675", "level": "\u001b[32mINFO\u001b[0m", "message": "Orders page accessed", "module": "order", "function": "list_orders", "line": 71}
+{"timestamp": "2025-12-07T15:30:55.480829", "level": "\u001b[32mINFO\u001b[0m", "message": "Orders page accessed", "module": "order", "function": "list_orders", "line": 71}
+{"timestamp": "2025-12-07T15:32:03.084598", "level": "\u001b[32mINFO\u001b[0m", "message": "Payment succeeded", "module": "logger", "function": "log_payment_attempt", "line": 263, "transaction_id": "pi_3SbjwLHxKDaqjWch1AEijYL1", "order_id": "ORD-9151F8CF"}
+{"timestamp": "2025-12-07T15:33:39.014268", "level": "\u001b[32mINFO\u001b[0m", "message": "Payment succeeded", "module": "logger", "function": "log_payment_attempt", "line": 263, "transaction_id": "pi_3SbjxtHxKDaqjWch0V3TcFTB", "order_id": "ORD-9151F8CF"}
+{"timestamp": "2025-12-07T15:48:53.868699", "level": "\u001b[32mINFO\u001b[0m", "message": "Payment System starting...", "module": "main", "function": "<module>", "line": 40}
+{"timestamp": "2025-12-07T15:48:53.868699", "level": "\u001b[32mINFO\u001b[0m", "message": "Environment: development", "module": "main", "function": "<module>", "line": 41}
+{"timestamp": "2025-12-07T15:48:55.903246", "level": "\u001b[32mINFO\u001b[0m", "message": "Orders page accessed", "module": "order", "function": "list_orders", "line": 71}
+{"timestamp": "2025-12-08T04:38:43.034768", "level": "\u001b[32mINFO\u001b[0m", "message": "Payment System starting...", "module": "main", "function": "<module>", "line": 40}
+{"timestamp": "2025-12-08T04:38:43.034768", "level": "\u001b[32mINFO\u001b[0m", "message": "Environment: development", "module": "main", "function": "<module>", "line": 41}
+{"timestamp": "2025-12-08T11:39:45.916157", "level": "\u001b[32mINFO\u001b[0m", "message": "Payment System starting...", "module": "main", "function": "<module>", "line": 40}
+{"timestamp": "2025-12-08T11:39:45.916157", "level": "\u001b[32mINFO\u001b[0m", "message": "Environment: development", "module": "main", "function": "<module>", "line": 41}
+{"timestamp": "2025-12-08T11:41:27.572884", "level": "\u001b[32mINFO\u001b[0m", "message": "Payment System starting...", "module": "main", "function": "<module>", "line": 40}
+{"timestamp": "2025-12-08T11:41:27.572884", "level": "\u001b[32mINFO\u001b[0m", "message": "Environment: development", "module": "main", "function": "<module>", "line": 41}
+{"timestamp": "2025-12-08T11:41:48.961356", "level": "\u001b[32mINFO\u001b[0m", "message": "Orders page accessed", "module": "order", "function": "list_orders", "line": 71}
+{"timestamp": "2025-12-08T11:53:39.006841", "level": "\u001b[32mINFO\u001b[0m", "message": "Payment System starting...", "module": "main", "function": "<module>", "line": 40}
+{"timestamp": "2025-12-08T11:53:39.006841", "level": "\u001b[32mINFO\u001b[0m", "message": "Environment: development", "module": "main", "function": "<module>", "line": 41}

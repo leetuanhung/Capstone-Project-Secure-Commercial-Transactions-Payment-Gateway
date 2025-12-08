@@ -390,3 +390,18 @@
 {"timestamp": "2025-11-29T13:50:22.986782", "level": "\u001b[32mINFO\u001b[0m", "message": "Login attempt", "module": "user", "function": "login_post", "line": 219}
 {"timestamp": "2025-11-29T13:50:23.498793", "level": "\u001b[32mINFO\u001b[0m", "message": "Security: login_success", "module": "logger", "function": "log_security_event", "line": 294, "user_id": 4, "ip_address": "127.0.0.1", "event_type": "login_success"}
 {"timestamp": "2025-11-29T13:50:23.498793", "level": "\u001b[32mINFO\u001b[0m", "message": "User 4 logged in successfully", "module": "user", "function": "login_post", "line": 272}
+{"timestamp": "2025-12-07T14:30:24.985704", "level": "\u001b[32mINFO\u001b[0m", "message": "Login attempt", "module": "user", "function": "login_post", "line": 219}
+{"timestamp": "2025-12-07T14:30:25.526250", "level": "\u001b[32mINFO\u001b[0m", "message": "Security: login_success", "module": "logger", "function": "log_security_event", "line": 294, "user_id": 5, "ip_address": "127.0.0.1", "event_type": "login_success"}
+{"timestamp": "2025-12-07T14:30:25.528258", "level": "\u001b[32mINFO\u001b[0m", "message": "User 5 logged in successfully", "module": "user", "function": "login_post", "line": 272}
+{"timestamp": "2025-12-07T14:30:25.618257", "level": "\u001b[32mINFO\u001b[0m", "message": "Login attempt", "module": "user", "function": "login_post", "line": 219}
+{"timestamp": "2025-12-07T14:30:26.077823", "level": "\u001b[32mINFO\u001b[0m", "message": "Security: login_success", "module": "logger", "function": "log_security_event", "line": 294, "user_id": 5, "ip_address": "127.0.0.1", "event_type": "login_success"}
+{"timestamp": "2025-12-07T14:30:26.079156", "level": "\u001b[32mINFO\u001b[0m", "message": "User 5 logged in successfully", "module": "user", "function": "login_post", "line": 272}
+{"timestamp": "2025-12-07T15:17:12.675391", "level": "\u001b[32mINFO\u001b[0m", "message": "Login attempt", "module": "user", "function": "login_post", "line": 219}
+{"timestamp": "2025-12-07T15:17:13.226542", "level": "\u001b[32mINFO\u001b[0m", "message": "Security: login_success", "module": "logger", "function": "log_security_event", "line": 294, "user_id": 5, "ip_address": "127.0.0.1", "event_type": "login_success"}
+{"timestamp": "2025-12-07T15:17:13.226542", "level": "\u001b[32mINFO\u001b[0m", "message": "User 5 logged in successfully", "module": "user", "function": "login_post", "line": 272}
+{"timestamp": "2025-12-07T15:22:01.167053", "level": "\u001b[32mINFO\u001b[0m", "message": "Login attempt", "module": "user", "function": "login_post", "line": 219}
+{"timestamp": "2025-12-07T15:22:01.721988", "level": "\u001b[32mINFO\u001b[0m", "message": "Security: login_success", "module": "logger", "function": "log_security_event", "line": 294, "user_id": 5, "ip_address": "127.0.0.1", "event_type": "login_success"}
+{"timestamp": "2025-12-07T15:22:01.722982", "level": "\u001b[32mINFO\u001b[0m", "message": "User 5 logged in successfully", "module": "user", "function": "login_post", "line": 272}
+{"timestamp": "2025-12-07T15:30:51.817617", "level": "\u001b[32mINFO\u001b[0m", "message": "Login attempt", "module": "user", "function": "login_post", "line": 219}
+{"timestamp": "2025-12-07T15:30:52.331875", "level": "\u001b[32mINFO\u001b[0m", "message": "Security: login_success", "module": "logger", "function": "log_security_event", "line": 294, "user_id": 5, "ip_address": "127.0.0.1", "event_type": "login_success"}
+{"timestamp": "2025-12-07T15:30:52.331875", "level": "\u001b[32mINFO\u001b[0m", "message": "User 5 logged in successfully", "module": "user", "function": "login_post", "line": 272}
