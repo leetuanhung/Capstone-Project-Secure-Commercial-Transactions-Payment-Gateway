@@ -12,6 +12,7 @@ class User(Base):
     email_encrypted = Column(Text, nullable=True)
     phone = Column(String, nullable=True)
     phone_encrypted = Column(Text, nullable=True)
+    email_verified = Column(Integer, default=0)  # 0 = chưa xác thực, 1 = đã xác thực
     created_at = Column(TIMESTAMP(timezone=True), server_default=text("now()"))
 
     orders = relationship("Order", back_populates="user")

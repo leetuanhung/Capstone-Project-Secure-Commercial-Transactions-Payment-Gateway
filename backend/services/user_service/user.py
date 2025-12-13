@@ -3,10 +3,11 @@ import hashlib
 import json
 import os
 import string
+import time
 from typing import Optional
 
 from fastapi import APIRouter, Form, Request, Depends
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from pathlib import Path
 from sqlalchemy.orm import Session
@@ -17,6 +18,7 @@ from backend.schemas import user
 from backend.utils import crypto
 from backend.oauth2 import oauth2
 from backend.services.payment_service.security.encryption import AESEncryption
+from backend.services.payment_service.otp_service import OTPService
 import logging
 
 from backend.utils.logger import(
@@ -31,6 +33,9 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent.parent
 templates = Jinja2Templates(directory=str(BASE_DIR / "frontend" / "templates"))
+
+# Khởi tạo OTP service
+otp_service = OTPService()
 
 
 USER_AES_KEY_ENV = "USER_AES_KEY"
@@ -285,7 +290,7 @@ async def register_get(request: Request):
         "error": None
     })
 
-@router.post("/register", response_class=HTMLResponse)
+@router.post("/register", response_class=JSONResponse)
 async def register_post(
     request: Request,
     name: str = Form(...),
@@ -300,15 +305,15 @@ async def register_post(
     normalized_email = _normalize(email).lower()
     normalized_phone = _normalize_phone(phone)
     if not normalized_phone:
-        return templates.TemplateResponse("register.html", {
-            "request": request,
-            "error": "Số điện thoại không hợp lệ"
-        })
+        return JSONResponse(
+            status_code=400,
+            content={"success": False, "error": "Số điện thoại không hợp lệ"}
+        )
     if len(normalized_phone) < 8 or len(normalized_phone) > 15:
-        return templates.TemplateResponse("register.html", {
-            "request": request,
-            "error": "Số điện thoại phải có từ 8 đến 15 chữ số"
-        })
+        return JSONResponse(
+            status_code=400,
+            content={"success": False, "error": "Số điện thoại phải có từ 8 đến 15 chữ số"}
+        )
     name_hash = _hash_value(normalized_name)
     email_hash = _hash_value(normalized_email)
     phone_hash = _hash_value(normalized_phone)
@@ -323,16 +328,16 @@ async def register_post(
                 exists_email = legacy_email
             except RuntimeError as exc:
                 db.rollback()
-                return templates.TemplateResponse("register.html", {
-                    "request": request,
-                    "error": str(exc)
-                })
+                return JSONResponse(
+                    status_code=400,
+                    content={"success": False, "error": str(exc)}
+                )
     if exists_email:
         print("ERROR: Email already exists")
-        return templates.TemplateResponse("register.html", {
-            "request": request, 
-            "error": "Email đã tồn tại"
-        })
+        return JSONResponse(
+            status_code=400,
+            content={"success": False, "error": "Email đã tồn tại"}
+        )
 
     exists_phone = db.query(User).filter(User.phone == phone_hash).first()
     if not exists_phone:
@@ -344,64 +349,200 @@ async def register_post(
                 exists_phone = legacy_phone
             except RuntimeError as exc:
                 db.rollback()
-                return templates.TemplateResponse("register.html", {
-                    "request": request,
-                    "error": str(exc)
-                })
+                return JSONResponse(
+                    status_code=400,
+                    content={"success": False, "error": str(exc)}
+                )
     if exists_phone:
         print("ERROR: Phone already exists")
-        return templates.TemplateResponse("register.html", {
-            "request": request,
-            "error": "Số điện thoại đã tồn tại"
-        })
+        return JSONResponse(
+            status_code=400,
+            content={"success": False, "error": "Số điện thoại đã tồn tại"}
+        )
     
     if password != confirm_password:
         print("ERROR: Passwords don't match")
-        return templates.TemplateResponse("register.html", {
-            "request": request, 
-            "error": "Mật khẩu không khớp"
-        })
+        return JSONResponse(
+            status_code=400,
+            content={"success": False, "error": "Mật khẩu không khớp"}
+        )
     
     if len(password) < 6:
         print("ERROR: Password too short")
-        return templates.TemplateResponse("register.html", {
-            "request": request, 
-            "error": "Mật khẩu phải có ít nhất 6 ký tự"
-        })
+        return JSONResponse(
+            status_code=400,
+            content={"success": False, "error": "Mật khẩu phải có ít nhất 6 ký tự"}
+        )
     
+    # Gửi OTP để xác thực email
     try:
+        otp_sent = otp_service.send_registration_otp(normalized_email, normalized_name)
+        if not otp_sent:
+            return JSONResponse(
+                status_code=500,
+                content={"success": False, "error": "Không thể gửi mã OTP. Vui lòng thử lại sau."}
+            )
+        
+        # Lưu thông tin đăng ký tạm thời (5 phút)
+        hashed_pass = crypto.hash(password)
         try:
             name_encrypted = _encrypt_value(normalized_name, _name_aad(name_hash))
             email_encrypted = _encrypt_value(normalized_email, _email_aad(email_hash))
             phone_encrypted = _encrypt_value(normalized_phone, _phone_aad(phone_hash))
         except RuntimeError as exc:
-            return templates.TemplateResponse("register.html", {
-                "request": request,
-                "error": str(exc)
-            })
-        hashed_pass = crypto.hash(password)
-        new_user = User(
-            name=name_hash,
-            email=email_hash,
-            password=hashed_pass,
-            name_encrypted=name_encrypted,
-            email_encrypted=email_encrypted,
-            phone=phone_hash,
-            phone_encrypted=phone_encrypted
-        )
-        db.add(new_user)
-        db.commit()
-        db.refresh(new_user)
-
-        return RedirectResponse(
-            url="/", 
-            status_code=303
+            return JSONResponse(
+                status_code=500,
+                content={"success": False, "error": str(exc)}
+            )
+        
+        registration_data = {
+            "name": normalized_name,
+            "name_hash": name_hash,
+            "name_encrypted": name_encrypted,
+            "email": normalized_email,
+            "email_hash": email_hash,
+            "email_encrypted": email_encrypted,
+            "phone": normalized_phone,
+            "phone_hash": phone_hash,
+            "phone_encrypted": phone_encrypted,
+            "password_hash": hashed_pass,
+            "timestamp": time.time()
+        }
+        
+        # Lưu vào Redis hoặc memory
+        reg_key = f"registration:{normalized_email}"
+        if otp_service.redis_client:
+            otp_service.redis_client.setex(reg_key, 300, json.dumps(registration_data))  # 5 phút
+        else:
+            if not hasattr(otp_service, '_registration_storage'):
+                otp_service._registration_storage = {}
+            otp_service._registration_storage[reg_key] = registration_data
+        
+        print(f"✅ OTP sent to {normalized_email}, waiting for verification")
+        return JSONResponse(
+            content={
+                "success": True,
+                "message": "Mã OTP đã được gửi đến email của bạn. Vui lòng kiểm tra email và nhập mã xác thực.",
+                "email": normalized_email
+            }
         )
         
     except Exception as e:
         print(f"ERROR: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return JSONResponse(
+            status_code=500,
+            content={"success": False, "error": f"Lỗi server: {str(e)}"}
+        )
+
+
+@router.post("/verify-registration-otp", response_class=JSONResponse)
+async def verify_registration_otp(
+    request: Request,
+    email: str = Form(...),
+    otp: str = Form(...),
+    db: Session = Depends(get_db)
+):
+    """Xác thực OTP và hoàn tất đăng ký tài khoản"""
+    try:
+        normalized_email = _normalize(email).lower()
+        is_valid = otp_service.verify_registration_otp(normalized_email, otp)
+        if not is_valid:
+            return JSONResponse(status_code=400, content={"success": False, "error": "Mã OTP không đúng hoặc đã hết hạn"})
+        
+        # Retrieve registration data
+        reg_key = f"registration:{normalized_email}"
+        registration_data = None
+        if otp_service.redis_client:
+            try:
+                data_json = otp_service.redis_client.get(reg_key)
+                if data_json:
+                    registration_data = json.loads(data_json)
+                    otp_service.redis_client.delete(reg_key)
+            except Exception as e:
+                print(f"⚠️ Redis get failed: {e}")
+        
+        if not registration_data and hasattr(otp_service, '_registration_storage'):
+            if reg_key in otp_service._registration_storage:
+                registration_data = otp_service._registration_storage[reg_key]
+                del otp_service._registration_storage[reg_key]
+        
+        if not registration_data:
+            return JSONResponse(status_code=400, content={"success": False, "error": "Phiên đăng ký đã hết hạn. Vui lòng đăng ký lại."})
+        
+        # Check email and phone again (in case someone else claimed during wait)
+        email_hash = registration_data["email_hash"]
+        phone_hash = registration_data["phone_hash"]
+        existing_email = db.query(User).filter(User.email == email_hash).first()
+        if existing_email:
+            return JSONResponse(status_code=400, content={"success": False, "error": "Email đã được đăng ký bởi người khác"})
+        existing_phone = db.query(User).filter(User.phone == phone_hash).first()
+        if existing_phone:
+            return JSONResponse(status_code=400, content={"success": False, "error": "Số điện thoại đã được đăng ký bởi người khác"})
+        
+        # Create user with email_verified = 1
+        new_user = User(
+            name=registration_data["name_hash"],
+            email=registration_data["email_hash"],
+            password=registration_data["password_hash"],
+            name_encrypted=registration_data["name_encrypted"],
+            email_encrypted=registration_data["email_encrypted"],
+            phone=registration_data["phone_hash"],
+            phone_encrypted=registration_data["phone_encrypted"],
+            email_verified=1
+        )
+        db.add(new_user)
+        db.commit()
+        db.refresh(new_user)
+        print(f"✅ User registered successfully: {normalized_email}")
+        
+        return JSONResponse(content={"success": True, "message": "Đăng ký tài khoản thành công! Bạn có thể đăng nhập ngay.", "redirect": "/"})
+    
+    except Exception as e:
+        print(f"ERROR in verify_registration_otp: {str(e)}")
+        import traceback
+        traceback.print_exc()
         db.rollback()
-        return templates.TemplateResponse("register.html", {
-            "request": request, 
-            "error": f"Lỗi server: {str(e)}"
-        })
+        return JSONResponse(status_code=500, content={"success": False, "error": f"Lỗi server: {str(e)}"})
+
+
+# API endpoint to get user information by ID
+@router.get("/users/{user_id}")
+async def get_user_info(user_id: int, db: Session = Depends(get_db)):
+    """
+    Get user information by user ID.
+    Returns decrypted email for display purposes.
+    """
+    try:
+        user = db.query(User).filter(User.id == user_id).first()
+        
+        if not user:
+            return JSONResponse(status_code=404, content={"error": "User not found"})
+        
+        # Decrypt email
+        try:
+            email_payload = json.loads(user.email_encrypted)
+            email_aad = f"user:email:{user.email}".encode("utf-8")
+            decrypted_email = AESEncryption.decrypt_aes_gcm(
+                email_payload,
+                _get_user_encryption_key(),
+                email_aad
+            )
+            
+            # Return user info with decrypted email
+            return JSONResponse(content={
+                "id": user.id,
+                "username": user.username,
+                "email": decrypted_email,
+                "email_verified": user.email_verified
+            })
+        except Exception as decrypt_error:
+            print(f"❌ Error decrypting email for user {user_id}: {decrypt_error}")
+            return JSONResponse(status_code=500, content={"error": "Failed to decrypt user email"})
+            
+    except Exception as e:
+        print(f"❌ Error in get_user_info: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return JSONResponse(status_code=500, content={"error": f"Server error: {str(e)}"})

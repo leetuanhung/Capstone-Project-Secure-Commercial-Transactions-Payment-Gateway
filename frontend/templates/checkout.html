@@ -34,11 +34,11 @@ body {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   min-height: 100vh;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
-  padding: 30px 20px;
+  padding: 20px 15px;
   position: relative;
-  overflow: hidden;
+  overflow-x: hidden;
 }
 
 body::before {
@@ -61,13 +61,15 @@ body::before {
   position: relative;
   z-index: 1;
   background: var(--white);
-  padding: 50px 40px;
-  border-radius: 24px;
+  padding: 30px 28px;
+  border-radius: 20px;
   box-shadow:
     0 20px 60px rgba(0, 0, 0, 0.3),
     0 0 0 1px rgba(255, 255, 255, 0.1) inset;
   width: 100%;
-  max-width: 520px;
+  max-width: 500px;
+  margin-top: 20px;
+  margin-bottom: 20px;
   animation: slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -86,13 +88,13 @@ h2 {
   text-align: center;
   color: var(--dark);
   font-weight: 800;
-  font-size: 2rem;
-  margin-bottom: 28px;
+  font-size: 1.75rem;
+  margin-bottom: 20px;
   letter-spacing: -0.5px;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 12px;
+  gap: 10px;
 }
 
 h2 i {
@@ -111,7 +113,7 @@ h2 i {
   border-radius: 16px;
   border-left: 5px solid var(--primary);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-  margin-bottom: 32px;
+  margin-bottom: 20px;
   animation: fadeIn 0.5s ease-out 0.2s backwards;
 }
 
@@ -148,19 +150,19 @@ h2 i {
 }
 
 .form-group {
-  margin-bottom: 24px;
+  margin-bottom: 18px;
   animation: fadeIn 0.5s ease-out backwards;
 }
 
 .form-group label {
   display: block;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
   font-weight: 600;
   color: var(--dark);
-  font-size: 15px;
+  font-size: 14px;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
 .form-group label i {
@@ -175,7 +177,7 @@ h2 i {
 /* Email input */
 .email-input {
   width: 100%;
-  padding: 14px 18px;
+  padding: 12px 16px;
   border: 2px solid #e2e8f0;
   border-radius: 12px;
   background: #f8fafc;
@@ -206,11 +208,11 @@ h2 i {
   color: white;
   border: none;
   border-radius: 12px;
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  margin-bottom: 20px;
+  margin-bottom: 15px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -719,41 +721,31 @@ h2 i {
     <input type="hidden" id="device-fingerprint-input" name="device_fingerprint">
     <input type="hidden" id="user-id-input" name="user_id">
 
-    <!-- 1. Email -->
-    <div class="form-group">
-      <label for="email-input">
-        <i class="fa-solid fa-envelope"></i> Email xác thực (nhận OTP)
-      </label>
-      <input type="email" id="email-input" name="email" class="email-input" placeholder="example@email.com" required>
-    </div>
+    <!-- OTP Status Messages -->
+    <div id="otp-message" class="otp-message" style="display: none;"></div>
 
-    <!-- 2. OTP Input (ẩn ban đầu) -->
-    <div class="form-group otp-input-group" id="otp-group" style="display: none;">
+    <!-- OTP Input (hiển thị ngay) -->
+    <div class="form-group otp-input-group" id="otp-group">
       <label for="otp-input">
         <i class="fa-solid fa-key"></i> Mã OTP (6 chữ số)
       </label>
+      <small style="color: #6b7280; font-size: 13px; margin-bottom: 10px; display: block;">
+        <i class="fa-solid fa-info-circle"></i> Mã OTP đã được tự động gửi đến email đã đăng ký của bạn
+      </small>
       <div class="otp-input-container">
         <input type="text" id="otp-input" name="otp" class="otp-input" placeholder="000000" maxlength="6">
         <button type="button" id="verify-otp-btn" class="verify-otp-btn">
           <i class="fa-solid fa-check"></i> Xác thực OTP
         </button>
-        <button type="button" id="resend-otp-btn" class="resend-btn" style="display: none;">
+        <button type="button" id="resend-otp-btn" class="resend-btn">
           <i class="fa-solid fa-redo"></i> Gửi lại
         </button>
       </div>
       <div class="otp-timer">
         <i class="fa-solid fa-clock"></i>
-        OTP có hiệu lực trong: <span id="countdown" class="countdown">05:00</span>
+        OTP có hiệu lực trong: <span id="countdown" class="countdown">Đang gửi...</span>
       </div>
     </div>
-
-    <!-- OTP Status Messages -->
-    <div id="otp-message" class="otp-message" style="display: none;"></div>
-
-    <!-- 3. Nút Gửi OTP -->
-    <button type="button" id="send-otp-btn" class="otp-button">
-      <i class="fa-solid fa-envelope"></i> Gửi mã OTP
-    </button>
 
     <!-- 4. Card section: chỉ hiển thị sau khi OTP đã xác thực -->
     <div id="card-section" style="display: none;">
@@ -811,9 +803,17 @@ const cardElement = elements.create('card', {
 
 let cardMounted = false;
 function mountCardElement() {
-  if (!cardMounted) {
-    cardElement.mount('#card-element');
-    cardMounted = true;
+  try {
+    if (!cardMounted) {
+      console.log('Mounting card element...');
+      cardElement.mount('#card-element');
+      cardMounted = true;
+      console.log('✅ Card element mounted successfully');
+    } else {
+      console.log('Card element already mounted');
+    }
+  } catch (err) {
+    console.error('Error mounting card element:', err);
   }
 }
 
@@ -824,6 +824,11 @@ const errorDiv = document.getElementById('payment-errors');
 const loadingDiv = document.getElementById('loading-message');
 const cardHolderName = document.getElementById('card-holder-name');
 const cardSection = document.getElementById('card-section');
+
+console.log('🔍 DOM Elements Check:');
+console.log('  submitButton:', submitButton);
+console.log('  cardSection:', cardSection);
+console.log('  cardHolderName:', cardHolderName);
 
 // user_id từ localStorage
 const userId = localStorage.getItem('user_id');
@@ -844,11 +849,14 @@ const orderId = "{{ order.id }}";
 const orderAmount = {{ order.amount | int }};
 const orderCurrency = "{{ order.currency }}";
 
+console.log('📦 Order Info:');
+console.log('  orderId:', orderId);
+console.log('  orderAmount:', orderAmount);
+console.log('  orderCurrency:', orderCurrency);
+
 // OTP DOM
-const emailInput = document.getElementById('email-input');
 const otpInput = document.getElementById('otp-input');
 const otpGroup = document.getElementById('otp-group');
-const sendOtpBtn = document.getElementById('send-otp-btn');
 const resendOtpBtn = document.getElementById('resend-otp-btn');
 const verifyOtpBtn = document.getElementById('verify-otp-btn');
 const countdownSpan = document.getElementById('countdown');
@@ -936,35 +944,26 @@ function resetOTPForm() {
 
 // Gửi OTP
 async function sendOTP() {
-  const email = emailInput.value.trim();
-  if (!email) {
-    showOTPMessage('Vui lòng nhập email!', 'error');
-    emailInput.focus();
-    emailInput.classList.add('error');
-    setTimeout(() => emailInput.classList.remove('error'), 2000);
-    return;
-  }
-
-  if (!email.includes('@')) {
-    showOTPMessage('Email không hợp lệ!', 'error');
-    emailInput.focus();
-    emailInput.classList.add('error');
-    setTimeout(() => emailInput.classList.remove('error'), 2000);
-    return;
-  }
-
   hideOTPMessage();
   resetOTPForm();
 
-  sendOtpBtn.disabled = true;
-  sendOtpBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang gửi...';
+  // Kiểm tra user đã đăng nhập chưa
+  if (!userId) {
+    showOTPMessage('❌ Vui lòng đăng nhập để tiếp tục thanh toán!', 'error');
+    countdownSpan.textContent = 'Lỗi';
+    return;
+  }
+
+  resendOtpBtn.disabled = true;
+  resendOtpBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang gửi...';
+  countdownSpan.textContent = 'Đang gửi...';
 
   try {
     const formData = new FormData();
-    formData.append('email', email);
     formData.append('amount', orderAmount);
     formData.append('currency', orderCurrency.toLowerCase());
     formData.append('order_id', orderId);
+    formData.append('user_id', userId);
 
     const response = await fetch('/payment_service/request_otp', {
       method: 'POST',
@@ -974,42 +973,36 @@ async function sendOTP() {
     const data = await response.json();
 
     if (response.ok && data.success !== false) {
-      sendOtpBtn.classList.add('success');
-      sendOtpBtn.innerHTML = '<i class="fa-solid fa-check-circle"></i> Đã gửi OTP';
-      createConfetti(sendOtpBtn);
+      const emailMasked = data.email_masked || '***';
+      showOTPMessage(`✅ OTP đã được gửi đến ${emailMasked}!`, 'success');
 
-      showOTPMessage('✅ OTP đã được gửi đến email của bạn!', 'success');
-
-      // Hiện OTP group
-      otpGroup.style.display = 'block';
       otpInput.focus();
-
-      // Sau 30s mới cho hiện nút Gửi lại
-      resendOtpBtn.style.display = 'none';
-      setTimeout(() => {
-        resendOtpBtn.style.display = 'inline-block';
-      }, 30000);
-
+      
+      // Reset và bắt đầu countdown
+      resetOTPForm();
       startCountdown();
+      
+      // Hiển thị nút Gửi lại ngay
+      resendOtpBtn.style.display = 'inline-block';
+      resendOtpBtn.disabled = false;
+      console.log('✅ OTP sent successfully, resend button displayed');
     } else {
       const errorMsg = data.error || data.detail || 'Không thể gửi OTP';
       showOTPMessage('❌ ' + errorMsg, 'error');
+      countdownSpan.textContent = 'Lỗi';
     }
   } catch (err) {
     console.error('OTP Error:', err);
     showOTPMessage('❌ Lỗi kết nối. Vui lòng thử lại!', 'error');
+    countdownSpan.textContent = 'Lỗi';
   } finally {
-    setTimeout(() => {
-      sendOtpBtn.disabled = false;
-      sendOtpBtn.classList.remove('success');
-      sendOtpBtn.innerHTML = '<i class="fa-solid fa-envelope"></i> Gửi mã OTP';
-    }, 1000);
+    resendOtpBtn.disabled = false;
+    resendOtpBtn.innerHTML = '<i class="fa-solid fa-redo"></i> Gửi lại';
   }
 }
 
 // Xác thực OTP
 async function verifyOTP() {
-  const email = emailInput.value.trim();
   const otp = otpInput.value.trim();
 
   if (otpGroup.style.display === 'none') {
@@ -1025,50 +1018,103 @@ async function verifyOTP() {
     return;
   }
 
+  if (!userId) {
+    showOTPMessage('❌ Vui lòng đăng nhập để tiếp tục!', 'error');
+    return;
+  }
+
+  // Ngăn chặn gọi nhiều lần
+  if (otpVerified) {
+    console.log('⚠️ OTP already verified, skipping...');
+    return;
+  }
+  
+  // Disable button ngay lập tức để tránh double-click
+  if (verifyOtpBtn.disabled) {
+    console.log('⚠️ Verify already in progress, skipping...');
+    return;
+  }
+
   verifyOtpBtn.disabled = true;
   verifyOtpBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang xác thực...';
 
   try {
     const formData = new FormData();
-    formData.append('email', email);
     formData.append('otp', otp);
     formData.append('order_id', orderId);
     formData.append('amount', orderAmount);
     formData.append('currency', orderCurrency.toLowerCase());
+    formData.append('user_id', userId);
 
     const response = await fetch('/payment_service/verify_otp', {
       method: 'POST',
       body: formData
     });
 
+    console.log('Verify OTP response status:', response.status);
+    console.log('Verify OTP response ok:', response.ok);
+    
     const data = await response.json();
+    console.log('Verify OTP data:', data);
 
     if (response.ok && data.success !== false) {
-      otpVerified = true;
-      if (otpCountdown) clearInterval(otpCountdown);
-      countdownSpan.textContent = 'ĐÃ XÁC THỰC';
-      countdownSpan.className = 'countdown';
+      try {
+        console.log('✅ OTP verification successful!');
+        otpVerified = true;
+        
+        // Lưu trạng thái verified vào sessionStorage
+        const otpVerifiedKey = `otp_verified_${orderId}`;
+        sessionStorage.setItem(otpVerifiedKey, 'true');
+        console.log('Session storage set:', otpVerifiedKey);
+        
+        if (otpCountdown) clearInterval(otpCountdown);
+        countdownSpan.textContent = 'ĐÃ XÁC THỰC';
+        countdownSpan.className = 'countdown';
+        console.log('Countdown updated');
 
-      showOTPMessage('✅ OTP chính xác. Bạn có thể nhập thông tin thẻ và thanh toán.', 'success');
+        showOTPMessage('✅ OTP chính xác. Bạn có thể nhập thông tin thẻ và thanh toán.', 'success');
+        console.log('Success message shown');
 
-      // Khoá email & OTP để tránh đổi lại
-      emailInput.readOnly = true;
-      otpInput.readOnly = true;
+        // Khoá OTP để tránh đổi lại
+        otpInput.readOnly = true;
 
-      sendOtpBtn.style.display = 'none';
-      resendOtpBtn.style.display = 'none';
-      verifyOtpBtn.style.display = 'none';
+        resendOtpBtn.style.display = 'none';
+        verifyOtpBtn.style.display = 'none';
+        console.log('OTP buttons hidden');
 
-      // Hiện phần thẻ
-      cardSection.style.display = 'block';
-      mountCardElement();
-      cardHolderName.focus();
+        // Hiện phần thẻ
+        console.log('Showing card section...');
+        cardSection.style.display = 'block';
+        console.log('Card section displayed');
+        
+        mountCardElement();
+        console.log('Card element mounted');
+        
+        // Scroll mượt đến phần nhập thẻ
+        setTimeout(() => {
+          cardSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          console.log('Scrolled to card section');
+        }, 300);
+        
+        if (cardHolderName) {
+          setTimeout(() => {
+            cardHolderName.focus();
+            console.log('Card holder name focused');
+          }, 800);
+        }
 
-      // Enable nút thanh toán
-      submitButton.disabled = false;
-      submitButton.innerHTML = '<i class="fa-solid fa-shield-check"></i> Thanh Toán ' +
-        orderAmount.toLocaleString('vi-VN') + ' VND';
+        // Enable nút thanh toán
+        submitButton.disabled = false;
+        submitButton.innerHTML = '<i class="fa-solid fa-shield-check"></i> Thanh Toán ' +
+          orderAmount.toLocaleString('vi-VN') + ' VND';
+        console.log('✅ Submit button enabled');
+        console.log('✅ ALL UI UPDATES COMPLETED SUCCESSFULLY');
+      } catch (uiError) {
+        console.error('❌ Error updating UI after OTP verify:', uiError);
+        showOTPMessage('⚠️ OTP đã xác thực nhưng có lỗi hiển thị. Vui lòng reload trang.', 'warning');
+      }
     } else {
+      console.log('❌ OTP verification failed:', data);
       otpVerified = false;
       const errorMsg = data.error || data.detail || 'Mã OTP không chính xác. Vui lòng thử lại hoặc gửi lại mã mới.';
       showOTPMessage('❌ ' + errorMsg, 'error');
@@ -1087,11 +1133,6 @@ async function verifyOTP() {
   }
 }
 
-// Event listeners OTP
-sendOtpBtn.addEventListener('click', sendOTP);
-resendOtpBtn.addEventListener('click', sendOTP);
-verifyOtpBtn.addEventListener('click', verifyOTP);
-
 // Auto-format OTP input
 otpInput.addEventListener('input', function () {
   this.value = this.value.replace(/\D/g, '');
@@ -1101,6 +1142,34 @@ otpInput.addEventListener('input', function () {
   } else {
     this.classList.remove('success');
   }
+});
+
+// Event listeners OTP
+resendOtpBtn.addEventListener('click', sendOTP);
+verifyOtpBtn.addEventListener('click', verifyOTP);
+
+// Tự động gửi OTP khi trang load
+window.addEventListener('DOMContentLoaded', function() {
+  // Scroll lên đầu trang
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  
+  console.log('🚀 DOMContentLoaded event fired');
+  console.log('📝 userId:', userId);
+  console.log('📝 orderId:', orderId);
+  console.log('📝 orderAmount:', orderAmount);
+  
+  // Đợi một chút để đảm bảo userId đã được load
+  setTimeout(() => {
+    console.log('⏰ Timeout triggered, checking userId...');
+    if (userId) {
+      console.log('🔐 Tự động gửi OTP cho user:', userId);
+      sendOTP();
+    } else {
+      console.log('❌ No userId found!');
+      showOTPMessage('❌ Vui lòng đăng nhập để tiếp tục thanh toán!', 'error');
+      countdownSpan.textContent = 'Chưa đăng nhập';
+    }
+  }, 500);
 });
 
 // ========= Payment submit =========

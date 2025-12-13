@@ -1,0 +1,60 @@
+
+
+@router.post("/verify-registration-otp", response_class=JSONResponse)
+async def verify_registration_otp(
+    request: Request,
+    email: str = Form(...),
+    otp: str = Form(...),
+    db: Session = Depends(get_db)
+):
+    """Xác thực OTP và hoàn tất đăng ký tài khoản"""
+    try:
+        normalized_email = _normalize(email).lower()
+        is_valid = otp_service.verify_registration_otp(normalized_email, otp)
+        if not is_valid:
+            return JSONResponse(status_code=400, content={"success": False, "error": "Mã OTP không đúng hoặc đã hết hạn"})
+        reg_key = f"registration:{normalized_email}"
+        registration_data = None
+        if otp_service.redis_client:
+            try:
+                data_json = otp_service.redis_client.get(reg_key)
+                if data_json:
+                    registration_data = json.loads(data_json)
+                    otp_service.redis_client.delete(reg_key)
+            except Exception as e:
+                print(f"⚠️ Redis get failed: {e}")
+        if not registration_data and hasattr(otp_service, '_registration_storage'):
+            if reg_key in otp_service._registration_storage:
+                registration_data = otp_service._registration_storage[reg_key]
+                del otp_service._registration_storage[reg_key]
+        if not registration_data:
+            return JSONResponse(status_code=400, content={"success": False, "error": "Phiên đăng ký đã hết hạn. Vui lòng đăng ký lại."})
+        email_hash = registration_data["email_hash"]
+        phone_hash = registration_data["phone_hash"]
+        existing_email = db.query(User).filter(User.email == email_hash).first()
+        if existing_email:
+            return JSONResponse(status_code=400, content={"success": False, "error": "Email đã được đăng ký bởi người khác"})
+        existing_phone = db.query(User).filter(User.phone == phone_hash).first()
+        if existing_phone:
+            return JSONResponse(status_code=400, content={"success": False, "error": "Số điện thoại đã được đăng ký bởi người khác"})
+        new_user = User(
+            name=registration_data["name_hash"],
+            email=registration_data["email_hash"],
+            password=registration_data["password_hash"],
+            name_encrypted=registration_data["name_encrypted"],
+            email_encrypted=registration_data["email_encrypted"],
+            phone=registration_data["phone_hash"],
+            phone_encrypted=registration_data["phone_encrypted"],
+            email_verified=1
+        )
+        db.add(new_user)
+        db.commit()
+        db.refresh(new_user)
+        print(f"✅ User registered successfully: {normalized_email}")
+        return JSONResponse(content={"success": True, "message": "Đăng ký tài khoản thành công! Bạn có thể đăng nhập ngay.", "redirect": "/"})
+    except Exception as e:
+        print(f"ERROR in verify_registration_otp: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        db.rollback()
+        return JSONResponse(status_code=500, content={"success": False, "error": f"Lỗi server: {str(e)}"})

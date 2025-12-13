@@ -90,18 +90,96 @@
         .login-link a:hover { 
             text-decoration: underline; 
         }
+        
+        /* OTP Modal Styles */
+        .otp-modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            animation: fadeIn 0.3s;
+        }
+        .otp-modal-content {
+            background-color: #fff;
+            margin: 10% auto;
+            padding: 30px;
+            border-radius: 15px;
+            width: 90%;
+            max-width: 400px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            animation: slideIn 0.4s;
+        }
+        .otp-modal h3 {
+            margin-top: 0;
+            color: #667eea;
+            text-align: center;
+        }
+        .otp-input {
+            width: 100%;
+            padding: 15px;
+            font-size: 20px;
+            text-align: center;
+            letter-spacing: 8px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .otp-input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        .otp-buttons {
+            display: flex;
+            gap: 10px;
+        }
+        .otp-buttons button {
+            flex: 1;
+        }
+        .otp-close-btn {
+            background: #6b7280 !important;
+        }
+        .otp-close-btn:hover {
+            background: #4b5563 !important;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        @keyframes slideIn {
+            from { transform: translateY(-50px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        #status-message {
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            text-align: center;
+            display: none;
+        }
+        .status-success {
+            background: #d1fae5;
+            color: #065f46;
+            border-left: 4px solid #10b981;
+        }
+        .status-error {
+            background: #fee2e2;
+            color: #991b1b;
+            border-left: 4px solid #ef4444;
+        }
     </style>
 </head>
 <body>
     <div class="register-container">
         <h2>Đăng ký tài khoản</h2>
         
-        {% if error %}
-            <div class="error-message">{{ error }}</div>
-        {% endif %}
+        <div id="status-message"></div>
         
-        <!-- QUAN TRỌNG: Sửa form - ĐẶC BIỆT CHÚ Ý DÒNG NÀY -->
-        <form action="http://127.0.0.1:8000/auth/auth/register" method="post">
+        <form id="registerForm">
             <div class="input-group">
                 <label for="name">Họ tên</label>
                 <input type="text" id="name" name="name" required placeholder="Nhập họ tên đầy đủ">
@@ -127,7 +205,7 @@
                 <input type="password" id="confirm_password" name="confirm_password" required placeholder="Nhập lại mật khẩu">
             </div>
             
-            <button type="submit">Đăng ký</button>
+            <button type="submit" id="submitBtn">Đăng ký</button>
         </form>
         
         <div class="login-link">
@@ -135,39 +213,160 @@
         </div>
     </div>
 
+    <!-- OTP Modal -->
+    <div id="otpModal" class="otp-modal">
+        <div class="otp-modal-content">
+            <h3>Xác thực Email</h3>
+            <p style="text-align: center; color: #64748b; margin-bottom: 20px;">
+                Nhập mã OTP đã được gửi đến email <strong id="otpEmail"></strong>
+            </p>
+            <input type="text" id="otpInput" class="otp-input" maxlength="6" placeholder="000000" inputmode="numeric">
+            <div class="otp-buttons">
+                <button onclick="cancelOTP()" class="otp-close-btn">Hủy</button>
+                <button onclick="verifyOTP()">Xác nhận</button>
+            </div>
+        </div>
+    </div>
+
     <script>
-        // Thêm JavaScript để kiểm tra mật khẩu trước khi submit
-        document.querySelector('form').addEventListener('submit', function(e) {
+        let userEmail = '';
+        
+        // Handle register form submission
+        document.getElementById('registerForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
             const password = document.getElementById('password').value;
             const confirmPassword = document.getElementById('confirm_password').value;
             const phoneInput = document.getElementById('phone');
             const phoneDigits = phoneInput.value.replace(/\D/g, '');
+            const email = document.getElementById('email').value;
+            const name = document.getElementById('name').value;
             
+            // Validation
             if (password.length < 6) {
-                e.preventDefault();
-                alert('Mật khẩu phải có ít nhất 6 ký tự');
+                showMessage('Mật khẩu phải có ít nhất 6 ký tự', 'error');
                 return;
             }
             
             if (password !== confirmPassword) {
-                e.preventDefault();
-                alert('Mật khẩu không khớp');
+                showMessage('Mật khẩu không khớp', 'error');
                 return;
             }
 
             if (phoneDigits.length < 8 || phoneDigits.length > 15) {
-                e.preventDefault();
-                alert('Số điện thoại phải có từ 8 đến 15 chữ số');
+                showMessage('Số điện thoại phải có từ 8 đến 15 chữ số', 'error');
                 return;
             }
 
-            phoneInput.value = phoneDigits;
+            // Prepare form data
+            const formData = new FormData();
+            formData.append('name', name);
+            formData.append('email', email);
+            formData.append('phone', phoneDigits);
+            formData.append('password', password);
+            formData.append('confirm_password', confirmPassword);
             
-            // Hiển thị loading
-            const button = document.querySelector('button');
-            button.innerHTML = 'Đang xử lý...';
+            const button = document.getElementById('submitBtn');
+            button.innerHTML = 'Đang gửi OTP...';
             button.disabled = true;
+            
+            try {
+                const response = await fetch(`${window.location.origin}/auth/register`, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    userEmail = data.email;
+                    document.getElementById('otpEmail').textContent = data.email;
+                    document.getElementById('otpModal').style.display = 'block';
+                    showMessage('Mã OTP đã được gửi đến email của bạn!', 'success');
+                } else {
+                    showMessage(data.error || 'Đăng ký thất bại', 'error');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                showMessage('Lỗi kết nối server', 'error');
+            } finally {
+                button.innerHTML = 'Đăng ký';
+                button.disabled = false;
+            }
         });
+        
+        // Verify OTP
+        async function verifyOTP() {
+            const otpInput = document.getElementById('otpInput').value;
+            
+            if (!otpInput || otpInput.length !== 6) {
+                showMessage('Vui lòng nhập mã OTP 6 số', 'error');
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('email', userEmail);
+            formData.append('otp', otpInput);
+            
+            try {
+                const response = await fetch(`${window.location.origin}/auth/verify-registration-otp`, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showMessage(data.message || 'Đăng ký thành công!', 'success');
+                    setTimeout(() => {
+                        window.location.href = data.redirect || '/';
+                    }, 1500);
+                } else {
+                    showMessage(data.error || 'Mã OTP không đúng', 'error');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                showMessage('Lỗi kết nối server', 'error');
+            }
+        }
+        
+        // Cancel OTP modal
+        function cancelOTP() {
+            document.getElementById('otpModal').style.display = 'none';
+            document.getElementById('otpInput').value = '';
+        }
+        
+        // Show status message
+        function showMessage(message, type) {
+            const msgDiv = document.getElementById('status-message');
+            msgDiv.textContent = message;
+            msgDiv.className = type === 'success' ? 'status-success' : 'status-error';
+            msgDiv.style.display = 'block';
+            
+            setTimeout(() => {
+                msgDiv.style.display = 'none';
+            }, 5000);
+        }
+        
+        // OTP input auto-format
+        document.getElementById('otpInput').addEventListener('input', function(e) {
+            this.value = this.value.replace(/\D/g, '').slice(0, 6);
+        });
+        
+        // Enter key to verify OTP
+        document.getElementById('otpInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                verifyOTP();
+            }
+        });
+        
+        // Close modal on outside click
+        window.onclick = function(event) {
+            const modal = document.getElementById('otpModal');
+            if (event.target === modal) {
+                cancelOTP();
+            }
+        };
     </script>
 </body>
 </html>

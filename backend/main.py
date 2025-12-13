@@ -93,6 +93,7 @@ app.add_middleware(HMACVerifierMiddleware)
 # Include routers
 
 app.include_router(user.router, prefix="/auth")
+app.include_router(user.router, prefix="/user_service")  # For API calls from frontend
 app.include_router(payment.router, prefix="/payment")
 # Also expose payment service under /payment_service for templates referencing that path
 app.include_router(payment.router, prefix="/payment_service")
