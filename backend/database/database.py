@@ -6,10 +6,12 @@ from sqlalchemy.orm import Session
 
 # SQLALCHEMY_DATABASE_URL = 'postgresql://<username>:<password>@<ip-address/hostname>:<port>/<database_name'
 
-SQLALCHEMY_DATABASE_URL = (
+""" SQLALCHEMY_DATABASE_URL = (
     f"postgresql://{settings.database_username}:{settings.database_password}"
     f"@{settings.database_hostname}:{settings.database_port}/{settings.database_name}"
-)
+) """
+
+SQLALCHEMY_DATABASE_URL = "postgresql://data_xx7b_user:EJCa3IByt0Rp2gLdM6jmZpiLSaWID7V9@dpg-d54c4lshg0os739d2tlg-a/data_xx7b"
 
 engine = create_engine(SQLALCHEMY_DATABASE_URL)
 
