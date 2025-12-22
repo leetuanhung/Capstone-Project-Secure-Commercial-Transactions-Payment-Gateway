@@ -25,12 +25,16 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # Copy application code
 COPY backend /app/backend
 COPY frontend /app/frontend
+COPY start_server.py /app/start_server.py
 
 # Create necessary directories
 RUN mkdir -p /app/backend/logs /app/backend/certs
 
+# Make start script executable
+RUN chmod +x /app/start_server.py
+
 # Expose port (Render uses PORT environment variable, default 10000)
 EXPOSE 10000
 
-# Run the application
-CMD sh -c "uvicorn backend.main:app --host 0.0.0.0 --port ${PORT:-10000}"
+# Run with Python to get better error messages
+CMD ["python", "/app/start_server.py"]
