@@ -101,10 +101,13 @@ load_dotenv(dotenv_path=ROOT_DIR / ".env")
 STRIPE_PUBLIC_KEY = settings.Stripe_Public_Key
 STRIPE_SECRET_KEY = settings.Stripe_Secret_Key
 
-if not STRIPE_SECRET_KEY:
-    raise RuntimeError("STRIPE_SECRET_KEY not configured in .env")
-
-stripe.api_key = STRIPE_SECRET_KEY
+# Only fail if Stripe is actually used, not at import time
+if STRIPE_SECRET_KEY:
+    stripe.api_key = STRIPE_SECRET_KEY
+    print("✅ Stripe configured")
+else:
+    print("⚠️ STRIPE_SECRET_KEY not configured - payments will fail")
+    
 templates = Jinja2Templates(directory=str(ROOT_DIR / "frontend" / "templates"))
 
 # =========================
@@ -668,6 +671,18 @@ async def create_payment(
     # XỬ LÝ THANH TOÁN VỚI STRIPE
     # =========================
     try:
+        # Check Stripe configuration at runtime
+        if not STRIPE_SECRET_KEY:
+            return templates.TemplateResponse(
+                "error.html",
+                {
+                    "request": request,
+                    "error": "❌ Payment service not configured. Please contact administrator.",
+                    "error_code": ERROR_CODES["INTERNAL_ERROR"],
+                },
+                status_code=503,
+            )
+        
         intent = stripe.PaymentIntent.create(
             amount=order["amount"],
             currency=order["currency"],

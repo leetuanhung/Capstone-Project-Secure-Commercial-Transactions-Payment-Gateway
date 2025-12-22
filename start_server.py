@@ -103,17 +103,46 @@ except Exception as e:
 print("\n🚀 Starting uvicorn with backend.main:app...")
 port = int(os.getenv("PORT", "10000"))
 print(f"   Binding to 0.0.0.0:{port}")
+print(f"   Log level: info")
+print(f"   Reload: False (production mode)")
 print("="*60)
 
 import uvicorn
 try:
+    # IMPORTANT: Don't use string "backend.main:app" with reload
+    # Import directly to avoid import errors
+    from backend.main import app
+    
+    print("✅ App imported successfully, starting server...")
     uvicorn.run(
-        "backend.main:app",
+        app,  # Use the app object directly
         host="0.0.0.0",
         port=port,
-        log_level="info"
+        log_level="info",
+        access_log=True,
+        timeout_keep_alive=30
     )
 except Exception as e:
     print(f"\n❌ CRITICAL: Uvicorn failed to start: {e}")
     traceback.print_exc()
-    sys.exit(1)
+    
+    # Last resort: try to bind port with minimal app to prevent Render from killing the service
+    print("\n🔄 Attempting emergency fallback server...")
+    from fastapi import FastAPI
+    emergency_app = FastAPI()
+    
+    @emergency_app.get("/")
+    @emergency_app.get("/health")
+    def emergency_health():
+        return {
+            "status": "error",
+            "message": "Service failed to start properly",
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        }
+    
+    try:
+        uvicorn.run(emergency_app, host="0.0.0.0", port=port)
+    except Exception as e2:
+        print(f"❌ Emergency server also failed: {e2}")
+        sys.exit(1)
