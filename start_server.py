@@ -71,7 +71,37 @@ print("\n🔍 Testing backend.main import...")
 try:
     from backend import main
     print(f"✅ backend.main imported successfully")
-    print(f"   App object: {main.app}")
+    print(f"   App object type: {type(main.app)}")
+    print(f"   App routes count: {len(main.app.routes)}")
+except ImportError as e:
+    print(f"❌ CRITICAL: Import Error in backend.main")
+    print(f"   Error: {e}")
+    print("\n📋 Full traceback:")
+    traceback.print_exc()
+    
+    print("\n🔍 Attempting to identify missing dependency...")
+    print(f"   Error message: {str(e)}")
+    
+    print("\nℹ️ Starting minimal health server instead...")
+    from fastapi import FastAPI
+    import uvicorn
+    
+    minimal_app = FastAPI()
+    
+    @minimal_app.get("/")
+    @minimal_app.get("/health")
+    def health():
+        return {
+            "status": "degraded", 
+            "error": "backend.main import failed - ImportError",
+            "detail": str(e),
+            "traceback": traceback.format_exc()
+        }
+    
+    port = int(os.getenv("PORT", "10000"))
+    print(f"\n🚀 Starting minimal health server on 0.0.0.0:{port}")
+    uvicorn.run(minimal_app, host="0.0.0.0", port=port)
+    sys.exit(0)
 except Exception as e:
     print(f"❌ CRITICAL: Failed to import backend.main")
     print(f"   Error: {e}")
