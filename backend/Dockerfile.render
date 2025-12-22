@@ -1,0 +1,39 @@
+# Render-optimized Dockerfile
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    g++ \
+    libpq-dev \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/app \
+    PORT=8000
+
+# Copy requirements and install dependencies
+COPY requirements.txt /app/backend/requirements.txt
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r /app/backend/requirements.txt
+
+# Copy application code
+COPY . /app/backend
+
+# Create necessary directories
+RUN mkdir -p /app/backend/logs /app/backend/certs
+
+# Health check endpoint
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD curl -f http://localhost:${PORT}/health || exit 1
+
+# Expose port (Render uses PORT environment variable)
+EXPOSE ${PORT}
+
+# Run the application
+# Render requires binding to 0.0.0.0 and using $PORT
+CMD uvicorn backend.main:app --host 0.0.0.0 --port ${PORT}

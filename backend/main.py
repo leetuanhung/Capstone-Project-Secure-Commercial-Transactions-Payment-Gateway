@@ -99,6 +99,25 @@ app.include_router(payment.router, prefix="/payment")
 app.include_router(payment.router, prefix="/payment_service")
 app.include_router(order.router, prefix="/order_service")
 
+# Health check endpoint for Render/monitoring
+@app.get("/health")
+async def health_check():
+    """Health check endpoint for container orchestration and monitoring."""
+    try:
+        # Test database connection
+        from backend.database.database import SessionLocal
+        db = SessionLocal()
+        db.execute(text("SELECT 1"))
+        db.close()
+        return {
+            "status": "healthy",
+            "service": "payment-gateway-backend",
+            "database": "connected"
+        }
+    except Exception as e:
+        logger.error(f"Health check failed: {str(e)}")
+        raise HTTPException(status_code=503, detail="Service Unavailable")
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 templates = Jinja2Templates(directory=str(BASE_DIR / "frontend" / "templates"))
 

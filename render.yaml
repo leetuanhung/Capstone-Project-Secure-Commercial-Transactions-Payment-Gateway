@@ -1,0 +1,91 @@
+# Render Blueprint for NT219 Payment Gateway
+services:
+  # PostgreSQL Database
+  - type: pserv
+    name: nt219-postgres
+    env: docker
+    plan: free
+    region: singapore
+    disk:
+      name: postgres-data
+      mountPath: /var/lib/postgresql/data
+      sizeGB: 1
+    envVars:
+      - key: POSTGRES_USER
+        value: postgres
+      - key: POSTGRES_PASSWORD
+        generateValue: true
+      - key: POSTGRES_DB
+        value: payment_gateway
+
+  # Backend API Service
+  - type: web
+    name: nt219-backend
+    env: docker
+    region: singapore
+    plan: free
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    healthCheckPath: /health
+    envVars:
+      # Database connection
+      - key: database_hostname
+        fromService:
+          type: pserv
+          name: nt219-postgres
+          property: host
+      - key: database_port
+        value: 5432
+      - key: database_username
+        value: postgres
+      - key: database_password
+        fromService:
+          type: pserv
+          name: nt219-postgres
+          envVarKey: POSTGRES_PASSWORD
+      - key: database_name
+        value: payment_gateway
+      
+      # Application settings
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ALGORITHM
+        value: HS256
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: 30
+      
+      # Stripe API Keys (set these in Render dashboard)
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_PUBLISHABLE_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      
+      # Email configuration (if needed)
+      - key: SMTP_HOST
+        value: smtp.gmail.com
+      - key: SMTP_PORT
+        value: 587
+      - key: SMTP_USERNAME
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: SMTP_FROM_EMAIL
+        sync: false
+      
+      # Application environment
+      - key: ENVIRONMENT
+        value: production
+      - key: PYTHONUNBUFFERED
+        value: 1
+      - key: PYTHONPATH
+        value: /app
+      
+      # CORS settings
+      - key: ALLOWED_ORIGINS
+        value: "*"
+      
+      # Optional: Fraud detection model
+      - key: FRAUD_MODEL_PATH
+        value: /app/backend/services/payment_service/security/fraud_model_mock.pkl
