@@ -14,15 +14,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Set environment variables
 ENV PYTHONUNBUFFERED=1 \
     PYTHONPATH=/app \
-    PORT=8000
+    PORT=10000
 
 # Copy requirements and install dependencies
-COPY requirements.txt /app/backend/requirements.txt
+COPY backend/requirements.txt /app/backend/requirements.txt
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r /app/backend/requirements.txt
 
 # Copy application code
-COPY . /app/backend
+COPY backend /app/backend
+COPY frontend /app/frontend
 
 # Create necessary directories
 RUN mkdir -p /app/backend/logs /app/backend/certs
