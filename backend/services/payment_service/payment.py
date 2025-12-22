@@ -728,19 +728,18 @@ async def create_payment(
             # ✅ Ký biên lai bằng HSM
             signed_receipt = create_signed_receipt(receipt_data)
 
-            try:
-                converted_amount = float(order["amount"]) / 100 if order["currency"] == "vnd" else float(order["amount"])
-                
-                # Update existing order instead of creating new one
-                current_order_db.status = "SUCCESS"
-                current_order_db.total_price = converted_amount
-                db.commit()
-                db.refresh(current_order_db)
-                print(f"✅ Order updated in DB: id={current_order_db.id} owner={current_order_db.owner_id} total={converted_amount}")
-                
-            except Exception as e:
-                print(f"⚠️ Error updating order in DB: {e}")
-                db.rollback()
+            # Note: DB order update skipped - using MOCK_ORDERS
+            # Uncomment below when using real DB orders with proper order_id mapping
+            # try:
+            #     converted_amount = float(order["amount"]) / 100 if order["currency"] == "vnd" else float(order["amount"])
+            #     current_order_db.status = "SUCCESS"
+            #     current_order_db.total_price = converted_amount
+            #     db.commit()
+            #     db.refresh(current_order_db)
+            #     print(f"✅ Order updated in DB: id={current_order_db.id} owner={current_order_db.owner_id} total={converted_amount}")
+            # except Exception as e:
+            #     print(f"⚠️ Error updating order in DB: {e}")
+            #     db.rollback()
                 
             if order_id.startswith("CART-"):
                 del TEMP_CART_ORDER[order_id]
