@@ -94,6 +94,24 @@ Click **"Create Web Service"** và đợi build hoàn thành.
 
 ## 🔧 TROUBLESHOOTING
 
+### ❌ "failed to read dockerfile: open Dockerfile: no such file or directory"
+
+**Nguyên nhân**: Render không tìm thấy Dockerfile ở đúng vị trí
+
+**Giải pháp**:
+1. Đảm bảo có file `Dockerfile.render` ở root directory
+2. Kiểm tra `render.yaml`:
+```yaml
+dockerfilePath: ./Dockerfile.render
+dockerContext: ./
+```
+3. Commit và push lại:
+```bash
+git add Dockerfile.render .dockerignore
+git commit -m "Fix Dockerfile path for Render"
+git push origin main
+```
+
 ### ❌ Database connection failed
 
 **Nguyên nhân**: Backend không connect được database
