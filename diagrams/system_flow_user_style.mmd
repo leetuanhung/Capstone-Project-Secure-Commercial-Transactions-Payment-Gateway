@@ -1,0 +1,95 @@
+flowchart LR
+  %% Flow version matching the provided image layout (numbered steps)
+  %% Stripe PaymentIntent + webhook is the source of truth for final status.
+
+  %% Left: user + TLS
+  U["User"] -->|"1. API request"| TLS["https://"]
+
+  %% Logs (top-left)
+  LOGS["Logs"]
+
+  %% API Gateway box
+  subgraph GW["API GATEWAY"]
+    direction LR
+
+    subgraph MW["MIDDLEWARE"]
+      direction TB
+      MW_CSRF["CSRF"]
+      MW_HMAC["HMAC"]
+      MW_RL["RateLimit"]
+      MW_RID["RequestID"]
+      MW_CORS["CORS"]
+    end
+
+    LOGIN["Login"]
+  end
+
+  style GW stroke-dasharray: 6 4
+  style MW stroke-dasharray: 6 4
+
+  TLS -->|"2. Secure request over TLS"| MW_CSRF
+  MW_CSRF --> MW_HMAC --> MW_RL --> MW_RID --> MW_CORS -->|"3. Login request"| LOGIN
+
+  %% Database (top-middle)
+  DB[("Database")]
+
+  %% Auth verification
+  LOGIN -->|"4. Verify user (session/cookie)"| DB
+  DB -->|"11. Load data (user/order/cart)"| LOGIN
+  LOGIN -->|"5. Login success"| ORCH_IN
+
+  %% Payment orchestrator box (dashed)
+  subgraph ORCH["PAYMENT ORCHESTRATOR"]
+    direction LR
+    ORCH_IN["Nonce Replay guard"]
+    OTP["OTP"]
+    FD["Fraud detection"]
+    CP["Create PaymentIntent"]
+  end
+  style ORCH stroke-dasharray: 6 4
+
+  %% OTP flow (bottom lane)
+  ORCH_IN -->|"6. Send email OTP"| U
+  U -->|"7. Verify OTP"| OTP
+  ORCH_IN -->|"8. Nonce replay guard"| OTP
+  OTP -->|"9. Fraud detection"| FD
+  FD -->|"10. Create PaymentIntent"| CP
+
+  %% Receipt signing (like image)
+  RECEIPT["Kí biên lai"]
+  CP --> RECEIPT
+
+  %% Stripe + bank (right)
+  STRIPE["API STRIPE"]
+  BANK["BANK"]
+  %% Backend creates PaymentIntent and returns client_secret to browser
+  CP -->|"12. Create PaymentIntent (server)"| STRIPE
+  CP -->|"18. Response client_secret (pending)"| TLS
+
+  %% Client confirms with Stripe.js (handles 3DS/SCA)
+  SJ["Stripe.js confirm"]
+  U -->|"13. Confirm payment (Stripe.js)"| SJ --> STRIPE
+
+  STRIPE -->|"14. Payment request"| BANK
+  BANK -->|"15. success/fail"| STRIPE
+
+  %% FAIL node (right-bottom)
+  FAIL["FAIL"]
+  FD --> FAIL
+
+  %% Webhook verification + update DB
+  WHV["Xác thực webhook\n(verify Stripe-Signature + idempotency event.id)"]
+  STRIPE -->|"16. event payload"| WHV
+  WHV -->|"17. update database"| DB
+
+  %% Response path back
+  TLS -->|"19. Render UI / poll status"| U
+
+  %% Logging taps (minimal, like image arrows)
+  LOGIN --> LOGS
+  ORCH_IN --> LOGS
+  OTP --> LOGS
+  FD --> LOGS
+  CP --> LOGS
+  WHV --> LOGS
+  DB --> LOGS

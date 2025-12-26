@@ -39,10 +39,13 @@ def handle_payment_success(payment_intent):
     
 def handle_payment_method_attached(payment_method):
     # xu li khi phuong thuc thanh toan moi duoc gan vao khach hang
-    print(f"Da gan phuong thuc thanh toan {payment_method['id']}")
+    logger.info(
+        "Payment method attached",
+        extra={"payment_method_id": payment_method.get("id")},
+    )
     
 def handle_unhandle_event(event_type):
-    print(f"Bo qua su kien khong xu li: {event_type}")
+    logger.info("Webhook event ignored", extra={"event_type": event_type})
     
 def dispatch_event(event):
     

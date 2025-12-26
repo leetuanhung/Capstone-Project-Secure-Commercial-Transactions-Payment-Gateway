@@ -1,0 +1,33 @@
+flowchart LR
+  %% Sơ đồ liên kết module: middleware và các module/infra dùng chung.
+
+  subgraph MWBOX["Chuỗi middleware (thứ tự vào - incoming)"]
+    direction TB
+    CSRF["CSRF\nCSRFMiddleware"]
+    HMAC["HMAC\nHMACVerifierMiddleware"]
+    RL["RateLimit\nRateLimitMiddleware"]
+    RID["RequestID\nRequestIDMiddleware"]
+    CORS["CORS\nCORSMiddleware"]
+
+    CSRF --> HMAC --> RL --> RID --> CORS
+  end
+
+  subgraph DEPSBOX["Module dùng chung / hạ tầng"]
+    direction TB
+    U_CSRF["Tiện ích CSRF (backend/utils/csrf.py)\nChức năng: sinh token + set cookie + xác thực\nCông cụ: secrets + hmac.compare_digest + FastAPI/Starlette"]
+    LOGS["Ghi log (backend/utils/logger.py)\nChức năng: context theo request + che dữ liệu nhạy cảm + xoay log\nCông cụ: logging + RotatingFileHandler + contextvars + regex"]
+    REDIS["Redis (tuỳ chọn)\nChức năng: lưu sliding-window cho rate limit\nCông cụ: redis-py (pipeline/zset)"]
+    ENV["Biến môi trường\nChức năng: cấu hình secret/tls/redis\nCông cụ: os.getenv (+ dotenv load_dotenv trong rate limiter)"]
+  end
+
+  %% Phụ thuộc (khớp code hiện tại)
+  CSRF -->|dùng| U_CSRF
+  HMAC -->|đọc| ENV
+  RL -->|dùng| REDIS
+  RL -->|đọc| ENV
+  RL -->|ghi log| LOGS
+  RID -->|gắn context| LOGS
+
+  %% Visual style: dashed boxes like your sketch
+  style MWBOX fill:#ffffff,stroke:#444,stroke-width:2px,stroke-dasharray: 6 4
+  style DEPSBOX fill:#ffffff,stroke:#444,stroke-width:2px,stroke-dasharray: 6 4

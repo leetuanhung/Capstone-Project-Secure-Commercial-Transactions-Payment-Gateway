@@ -716,6 +716,7 @@ h2 i {
   <form id="payment-form">
     <!-- Hidden fields -->
     <input type="hidden" id="order-id" name="order_id" value="{{ order.id }}">
+    <input type="hidden" id="checkout-sig" name="checkout_sig" value="{{ checkout_sig }}">
     <input type="hidden" id="payment-token-input" name="payment_token">
     <input type="hidden" id="nonce-input" name="nonce">
     <input type="hidden" id="device-fingerprint-input" name="device_fingerprint">
@@ -780,6 +781,19 @@ const STRIPE_PUBLIC_KEY = "{{ stripe_public_key }}";
 const stripe = Stripe(STRIPE_PUBLIC_KEY);
 const elements = stripe.elements();
 
+function getCookie(name) {
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop().split(';').shift();
+  return null;
+}
+
+function withCsrf(headers) {
+  const token = getCookie('csrf_token');
+  if (token) headers['X-CSRF-Token'] = token;
+  return headers;
+}
+
 const cardElement = elements.create('card', {
   style: {
     base: {
@@ -830,29 +844,60 @@ console.log('  submitButton:', submitButton);
 console.log('  cardSection:', cardSection);
 console.log('  cardHolderName:', cardHolderName);
 
-// user_id từ localStorage
-const userId = localStorage.getItem('user_id');
+// user_id: ưu tiên localStorage, fallback sang cookie do backend set khi login
+const userId = localStorage.getItem('user_id') || getCookie('user_id');
 if (userId) {
   document.getElementById('user-id-input').value = userId;
-  console.log('✅ User ID loaded from localStorage:', userId);
+  if (!localStorage.getItem('user_id')) {
+    localStorage.setItem('user_id', userId);
+  }
+  console.log('✅ User ID loaded:', userId);
 } else {
-  console.log('⚠️ No user_id in localStorage - user may not be logged in');
+  console.log('⚠️ No user_id found in localStorage/cookies - user may not be logged in');
+}
+
+// Important: do not submit user_id from the browser.
+// The backend already authenticates the user via JWT/cookie; sending user_id can cause
+// false 403 (IDOR mismatch) when localStorage is stale (common during Burp testing).
+try {
+  const userIdInput = document.getElementById('user-id-input');
+  if (userIdInput) userIdInput.disabled = true;
+} catch (e) {
+  // ignore
 }
 
 // ========= OTP logic =========
 let otpCountdown = null;
-let otpTimeLeft = 300; // 5 minutes
+let otpTimeLeft = 60; // 1 minute
 let otpVerified = false;
+
+// Auto logout timer (used for card-entry step)
+let autoLogoutTimeout = null;
+function scheduleAutoLogout(seconds = 300) {
+  if (autoLogoutTimeout) clearTimeout(autoLogoutTimeout);
+  autoLogoutTimeout = setTimeout(() => {
+    window.location.href = '/user_service/logout';
+  }, seconds * 1000);
+}
+
+function cancelAutoLogout() {
+  if (autoLogoutTimeout) {
+    clearTimeout(autoLogoutTimeout);
+    autoLogoutTimeout = null;
+  }
+}
 
 // Order info
 const orderId = "{{ order.id }}";
 const orderAmount = {{ order.amount | int }};
 const orderCurrency = "{{ order.currency }}";
+const checkoutSig = document.getElementById('checkout-sig')?.value;
 
 console.log('📦 Order Info:');
 console.log('  orderId:', orderId);
 console.log('  orderAmount:', orderAmount);
 console.log('  orderCurrency:', orderCurrency);
+console.log('  checkoutSig:', checkoutSig ? checkoutSig.substring(0, 10) + '…' : null);
 
 // OTP DOM
 const otpInput = document.getElementById('otp-input');
@@ -917,7 +962,7 @@ function updateCountdown() {
 }
 
 function startCountdown() {
-  otpTimeLeft = 300;
+  otpTimeLeft = 60;
   updateCountdown();
 
   if (otpCountdown) clearInterval(otpCountdown);
@@ -929,14 +974,17 @@ function startCountdown() {
       clearInterval(otpCountdown);
       showOTPMessage('⏰ OTP đã hết hạn. Vui lòng gửi lại!', 'error');
       resendOtpBtn.style.display = 'inline-block';
+
+      // OTP chỉ cho 1 phút để nhập -> hết hạn thì đăng xuất
+      window.location.href = '/user_service/logout';
     }
   }, 1000);
 }
 
 function resetOTPForm() {
   if (otpCountdown) clearInterval(otpCountdown);
-  otpTimeLeft = 300;
-  countdownSpan.textContent = '05:00';
+  otpTimeLeft = 60;
+  countdownSpan.textContent = '01:00';
   countdownSpan.className = 'countdown';
   otpInput.value = '';
   otpVerified = false;
@@ -963,10 +1011,17 @@ async function sendOTP() {
     formData.append('amount', orderAmount);
     formData.append('currency', orderCurrency.toLowerCase());
     formData.append('order_id', orderId);
-    formData.append('user_id', userId);
+    formData.append('checkout_sig', checkoutSig);
+
+    const headers = withCsrf({});
+    const accessToken = localStorage.getItem('access_token');
+    if (accessToken) {
+      headers['Authorization'] = `Bearer ${accessToken}`;
+    }
 
     const response = await fetch('/payment_service/request_otp', {
       method: 'POST',
+      headers: headers,
       body: formData
     });
 
@@ -1044,10 +1099,17 @@ async function verifyOTP() {
     formData.append('order_id', orderId);
     formData.append('amount', orderAmount);
     formData.append('currency', orderCurrency.toLowerCase());
-    formData.append('user_id', userId);
+    formData.append('checkout_sig', checkoutSig);
+
+    const headers = withCsrf({});
+    const accessToken = localStorage.getItem('access_token');
+    if (accessToken) {
+      headers['Authorization'] = `Bearer ${accessToken}`;
+    }
 
     const response = await fetch('/payment_service/verify_otp', {
       method: 'POST',
+      headers: headers,
       body: formData
     });
 
@@ -1086,6 +1148,9 @@ async function verifyOTP() {
         console.log('Showing card section...');
         cardSection.style.display = 'block';
         console.log('Card section displayed');
+
+        // Card entry chỉ cho 2 phút
+        scheduleAutoLogout(120);
         
         mountCardElement();
         console.log('Card element mounted');
@@ -1214,7 +1279,7 @@ form.addEventListener('submit', async function (e) {
   const formData = new FormData(form);
 
   const accessToken = localStorage.getItem('access_token');
-  const headers = {};
+  const headers = withCsrf({});
   if (accessToken) {
     headers['Authorization'] = `Bearer ${accessToken}`;
   }

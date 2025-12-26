@@ -36,18 +36,22 @@ def create_access_token(data: dict):
     return encodeed_jwt
 
 
-def verify_access_token(token: str, credentials_exception):
+def verify_access_token(token: str, credentials_exception: HTTPException | None = None):
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         id: int = payload.get("user_id")
         if id is None:
-            raise credentials_exception
+            if credentials_exception is not None:
+                raise credentials_exception
+            return None
         token_data = TokenData(
             id=id
         )  # chuyển dữ liệu thô từ jwt sang một model dữ liệu có kiểm soát
     # nếu id không phải là chuỗi hoặc thiếu dữ liệu bắt buộc thì báo lỗi => điều này khiên code am toàn hơn thay vì chỉ tin vào dứ liệu thô từ token
     except JWTError:
-        raise credentials_exception
+        if credentials_exception is not None:
+            raise credentials_exception
+        return None
     return token_data
 
     """Khi server nhận được token, dòng lệnh trên sẽ:

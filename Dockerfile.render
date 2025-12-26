@@ -1,23 +1,20 @@
-# Render-optimized Dockerfile
 FROM python:3.11-slim
 
 WORKDIR /app
 
 # Install system dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN apt-get update && apt-get install -y \
     gcc \
-    g++ \
-    libpq-dev \
-    curl \
     postgresql-client \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Set environment variables
-ENV PYTHONUNBUFFERED=1 \
-    PYTHONPATH=/app \
-    PORT=10000
+ENV PYTHONPATH=/app
+ENV PYTHONUNBUFFERED=1
+ENV PORT=10000
 
-# Copy requirements and install dependencies
+# Copy requirements first for better caching
 COPY requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r /app/requirements.txt
@@ -25,19 +22,16 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # Copy application code
 COPY backend /app/backend
 COPY frontend /app/frontend
-COPY start_server.py /app/start_server.py
-
-# Ensure fraud model file exists (copy if available, ignore if not)
-COPY backend/services/payment_service/security/fraud_model_mock.pkl /app/backend/services/payment_service/security/fraud_model_mock.pkl 2>/dev/null || true
 
 # Create necessary directories
-RUN mkdir -p /app/backend/logs /app/backend/certs
+RUN mkdir -p /app/logs
 
-# Make start script executable
-RUN chmod +x /app/start_server.py
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+  CMD curl -f http://localhost:${PORT}/health || exit 1
 
-# Expose port (Render uses PORT environment variable, default 10000)
-EXPOSE 10000
+# Expose port (Render will use PORT env var)
+EXPOSE ${PORT}
 
-# Run with Python to get better error messages
-CMD ["python", "/app/start_server.py"]
+# Start command
+CMD uvicorn backend.main:app --host 0.0.0.0 --port ${PORT}

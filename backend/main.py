@@ -17,6 +17,7 @@ from backend.config.config import settings
 from backend.middleware.request_id import RequestIDMiddleware
 from backend.middleware.rate_limiter import RateLimitMiddleware
 from backend.middleware.hmac_verifier import HMACVerifierMiddleware
+from backend.middleware.csrf import CSRFMiddleware
 from backend.middleware.cors import setup_cors
 from sqlalchemy import text
 import logging
@@ -90,9 +91,9 @@ def _initialize_security_components() -> None:
         # hsm_client may warn if PKCS#11 is not available; import to surface
         # that information early in the startup logs.
         from backend.services.payment_service.security import hsm_client as _hsm
-        print("Security modules loaded: encryption, tokenization, hsm_client")
+        logger.info("Security modules loaded")
     except Exception as exc:  # pragma: no cover - defensive startup logging
-        print("Warning: some security components failed to initialize:", str(exc))
+        logger.warning("Some security components failed to initialize", exc_info=True)
 
 
 _initialize_security_components()
@@ -104,6 +105,20 @@ setup_cors(app)
 app.add_middleware(RequestIDMiddleware)
 app.add_middleware(RateLimitMiddleware)
 app.add_middleware(HMACVerifierMiddleware)
+app.add_middleware(
+    CSRFMiddleware,
+    exempt_paths=(
+        "/webhook",
+        "/debug-webhook",
+        "/openapi.json",
+    ),
+    exempt_prefixes=(
+        "/docs",
+        "/redoc",
+        "/auth",
+        "/user_service",
+    ),
+)
 
 # Include routers
 
@@ -214,7 +229,7 @@ async def debug_webhook(request: Request, background_tasks: BackgroundTasks, str
 
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request, message: Optional[str] = None):
-    return templates.TemplateResponse("login.html", {"request": request, "message": message})
+    return RedirectResponse(url="/user_service/login", status_code=303)
 
 
 @app.get("/store")

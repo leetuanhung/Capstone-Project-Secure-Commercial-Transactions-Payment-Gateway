@@ -53,3 +53,9 @@ six==1.17.0
 
 fastapi-mail==1.4.2
 redis==5.0.1
+
+# Machine Learning & Data Science (for fraud detection)
+scikit-learn==1.3.2
+joblib==1.3.2
+numpy==1.26.2
+pandas==2.1.4

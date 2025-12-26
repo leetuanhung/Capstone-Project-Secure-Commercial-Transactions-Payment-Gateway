@@ -1,0 +1,78 @@
+flowchart LR
+  %% Phân vùng theo lớp: Client/Frontend -> Gateway/Middleware -> Services -> External -> Data/Observability
+
+  subgraph CLIENT["Client / Frontend"]
+    direction TB
+    USER["Người dùng"]
+    UI["Web UI (templates)"]
+    TLS["HTTPS/TLS"]
+    USER --> UI --> TLS
+  end
+
+  subgraph GATEWAY["Backend (FastAPI) - Gateway/Middleware"]
+    direction LR
+    API["API"]
+    RID["RequestIDMiddleware"]
+    RL["RateLimitMiddleware"]
+    HMACMW["HMACVerifierMiddleware\n(X-Signature optional)"]
+    CSRFMW["CSRFMiddleware\n(double-submit cookie)\n(exempt paths: /webhook, /debug-webhook, /openapi.json)\n(exempt prefixes: /docs, /redoc, /auth, /user_service)"]
+    ROUTE["Routers\n(/order_service, /payment, /payment_service, /auth, /user_service)"]
+    API --> RID --> RL --> HMACMW --> CSRFMW --> ROUTE
+  end
+
+  subgraph SERVICES["Services"]
+    direction TB
+    ORD["Order service\n(/order_service/...)"]
+
+    subgraph PAYBOX["Payment service (/payment/... & /payment_service/...)"]
+      direction TB
+      SIGCTX["Anti-tamper checkout_sig\n(verify order_id + amount + currency)"]
+      NR["Nonce replay guard\n(Redis SET NX + TTL)\n(trong create_payment)"]
+      ENCMAIL["Field encryption\n(decrypt user email - AES-GCM/AAD)\n(để gửi/verify OTP)"]
+      OTP["OTP\n(request_otp, verify_otp)\n(BẮT BUỘC trước thanh toán)"]
+      FD["Fraud detection\n(FraudDetector)\n(block nếu fraud; fail-open nếu lỗi)"]
+      CP["Create payment\n(create_payment → Stripe PaymentIntent confirm)"]
+      PERSIST["Persist history/status\n(PaymentHistory, order status)"]
+      RECEIPT["Kí biên lai\n(create_signed_receipt: HSM / fallback)\n(trả về success.html)"]
+
+      %% bố cục gợi nhớ hình của bạn
+      NR ~~~ OTP
+      FD ~~~ CP
+    end
+
+    WH["Webhook endpoint\n(POST /webhook)"]
+    SIGV["Verify Stripe webhook signature\n(Stripe-Signature + STRIPE_WEBHOOK_SECRET)"]
+    DISPATCH["Dispatch event (background task)\n(update DB/status/log)"]
+  end
+
+  %% dashed border cho Payment box (giống vùng Payment nét đứt)
+  style PAYBOX stroke-dasharray: 6 4
+
+  subgraph EXTERNAL["External"]
+    STRIPE["Stripe API"]
+  end
+
+  subgraph DATA["Data / Observability"]
+    DB[("Database")]
+    LOGS["Logs"]
+  end
+
+  %% Luồng chính
+  TLS --> API
+  ROUTE -->|"Request"| ORD
+  ROUTE -->|"POST create_payment"| SIGCTX
+  SIGCTX --> NR --> ENCMAIL --> OTP --> FD --> CP --> PERSIST --> RECEIPT
+
+  %% Stripe + persist + logs
+  CP -->|"PaymentIntent"| STRIPE
+  PERSIST --> DB
+  CP --> LOGS
+  PERSIST --> LOGS
+  RECEIPT --> LOGS
+
+  %% Webhook async
+  STRIPE -->|"Webhook events"| WH --> SIGV --> DISPATCH --> DB
+  SIGV --> LOGS
+  DISPATCH --> LOGS
+
+  %% Ghi chú: webhook chủ yếu cập nhật trạng thái + log; biên lai được ký khi thanh toán thành công (response success.html)

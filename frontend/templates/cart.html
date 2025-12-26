@@ -72,6 +72,79 @@ body::before {
   animation: slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+.cart-layout {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr;
+  gap: 20px;
+  align-items: start;
+}
+
+.panel {
+  background: var(--white);
+}
+
+.history-panel {
+  background: linear-gradient(135deg, #f1f5f9, #e2e8f0);
+  border-radius: 16px;
+  padding: 22px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.history-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 800;
+  color: var(--dark);
+  font-size: 1.2rem;
+  margin-bottom: 14px;
+}
+
+.history-title i {
+  color: var(--primary);
+}
+
+.history-item {
+  background: var(--white);
+  border-radius: 12px;
+  padding: 14px 14px;
+  border: 1px solid #e2e8f0;
+  margin-bottom: 12px;
+}
+
+.history-item:last-child {
+  margin-bottom: 0;
+}
+
+.history-item .row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+  color: var(--gray);
+  margin-top: 6px;
+}
+
+.history-item .desc {
+  font-weight: 700;
+  color: var(--dark);
+  font-size: 14px;
+}
+
+.history-item .amount {
+  font-weight: 800;
+  color: var(--primary);
+}
+
+.history-empty {
+  color: var(--gray);
+  font-weight: 600;
+  background: var(--white);
+  border: 1px dashed #cbd5e1;
+  border-radius: 12px;
+  padding: 16px;
+}
+
 @keyframes slideUp {
   from {
     opacity: 0;
@@ -341,6 +414,10 @@ h2 i {
   .container {
     padding: 24px 16px;
   }
+
+  .cart-layout {
+    grid-template-columns: 1fr;
+  }
   
   h2 {
     font-size: 1.8rem;
@@ -468,44 +545,70 @@ h2 i {
 <div class="container">
     <h2><i class="fa-solid fa-shopping-cart"></i> Giỏ Hàng Của Bạn</h2>
 
-    {% if cart|length == 0 %}
+  <div class="cart-layout">
+    <div class="panel">
+      {% if cart|length == 0 %}
         <p class="empty"><i class="fa-regular fa-face-frown"></i> Giỏ hàng của bạn đang trống!</p>
         <div class="action-buttons" style="text-align:center;">
-            <a href="/order_service/orders" class="button back"><i class="fa-solid fa-store"></i> Quay lại cửa hàng</a>
+          <a href="/order_service/orders" class="button back"><i class="fa-solid fa-store"></i> Quay lại cửa hàng</a>
         </div>
-    {% else %}
+      {% else %}
         <table class="table">
-            <thead>
-                <tr>
-                    <th>Sản phẩm</th>
-                    <th>Mã SP</th>
-                    <th>Giá (VND)</th>
-                    <th>Trạng thái</th>
-                    <th>Hành động</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for item in cart %}
-                <tr>
-                    <td>{{ item.description }}</td>
-                    <td>{{ item.id }}</td>
-                    <td>{{ "{:,.0f}".format(item.amount | int) }}</td>
-                    <td>{{ item.status }}</td>
-                    <td><a href="/order_service/remove_from_cart?order_id={{ item.id }}" class="remove-btn"><i class="fa-solid fa-trash"></i> Xóa</a></td>
-                </tr>
-                {% endfor %}
-            </tbody>
+          <thead>
+            <tr>
+              <th>Sản phẩm</th>
+              <th>Mã SP</th>
+              <th>Giá (VND)</th>
+              <th>Trạng thái</th>
+              <th>Hành động</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in cart %}
+            <tr>
+              <td>{{ item.description }}</td>
+              <td>{{ item.id }}</td>
+              <td>{{ "{:,.0f}".format(item.amount | int) }}</td>
+              <td>{{ item.status }}</td>
+              <td><a href="/order_service/remove_from_cart?order_id={{ item.id }}" class="remove-btn"><i class="fa-solid fa-trash"></i> Xóa</a></td>
+            </tr>
+            {% endfor %}
+          </tbody>
         </table>
 
         <div class="total-section">
-            Tổng cộng: <strong style="color:#e74c3c;">{{ "{:,.0f}".format(total | int) }} VND</strong>
+          Tổng cộng: <strong style="color:#e74c3c;">{{ "{:,.0f}".format(total | int) }} VND</strong>
         </div>
 
         <div class="action-buttons">
-            <a href="/order_service/orders" class="button back"><i class="fa-solid fa-arrow-left"></i> Tiếp tục mua</a>
-            <a href="/payment_service/checkout_cart" class="button checkout"><i class="fa-solid fa-credit-card"></i> Thanh toán tất cả</a>
+          <a href="/order_service/orders" class="button back"><i class="fa-solid fa-arrow-left"></i> Tiếp tục mua</a>
+          <a href="/payment_service/checkout_cart" class="button checkout"><i class="fa-solid fa-credit-card"></i> Thanh toán tất cả</a>
         </div>
-    {% endif %}
+      {% endif %}
+    </div>
+
+    <aside class="history-panel">
+      <div class="history-title"><i class="fa-solid fa-clock-rotate-left"></i> Lịch sử giao dịch</div>
+
+      {% if history is not defined or history|length == 0 %}
+        <div class="history-empty">Chưa có giao dịch thành công.</div>
+      {% else %}
+        {% for h in history %}
+          <div class="history-item">
+            <div class="desc">{{ h.description }}</div>
+            <div class="row">
+              <span>{{ h.id }}</span>
+              <span class="amount">{{ "{:,.0f}".format(h.amount | int) }} {{ (h.currency or 'VND') }}</span>
+            </div>
+            <div class="row">
+              <span>{{ h.status }}</span>
+              <span>{{ h.paid_at }}</span>
+            </div>
+          </div>
+        {% endfor %}
+      {% endif %}
+    </aside>
+  </div>
 </div>
 </body>
 </html>

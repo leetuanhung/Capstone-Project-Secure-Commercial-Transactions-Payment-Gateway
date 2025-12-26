@@ -3,6 +3,7 @@ import logging.handlers
 import json
 import os
 import re
+from contextvars import ContextVar
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any, Optional
@@ -41,6 +42,7 @@ class SensitiveDataFilter(logging.Filter):
         "card_number": re.compile(r"\b\d{13,19}\b"),
         "cvv": re.compile(r"\bcvv[:\s=]*\d{3,4}\b", re.IGNORECASE),
         "password": re.compile(r"\bpassword[:\s=]*\S+\b", re.IGNORECASE),
+        "otp": re.compile(r"\b(?:otp|code|verification_code)[:\s=]*\d{4,8}\b", re.IGNORECASE),
         "email": re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b"),
         "api_key": re.compile(r"(sk_|pk_|Bearer\s+)[A-Za-z0-9_-]+", re.IGNORECASE),
     }
@@ -55,7 +57,23 @@ class SensitiveDataFilter(logging.Filter):
                 for arg in record.args
             )
 
+        # Redact extra fields as well (important for JSON logs)
+        for key, value in list(record.__dict__.items()):
+            if key.startswith("_"):
+                continue
+            record.__dict__[key] = self._redact_obj(value)
+
         return True
+
+    def _redact_obj(self, value: Any) -> Any:
+        if isinstance(value, str):
+            return self._redact(value)
+        if isinstance(value, dict):
+            return {k: self._redact_obj(v) for k, v in value.items()}
+        if isinstance(value, (list, tuple)):
+            redacted = [self._redact_obj(v) for v in value]
+            return type(value)(redacted) if isinstance(value, tuple) else redacted
+        return value
 
     def _redact(self, text: str) -> str:
         # Mask card numbers
@@ -66,6 +84,9 @@ class SensitiveDataFilter(logging.Filter):
         text = self.PATTERNS["cvv"].sub("[CVV_REDACTED]", text)
         # Remove passwords
         text = self.PATTERNS["password"].sub("password=[REDACTED]", text)
+
+        # Remove OTP-like values
+        text = self.PATTERNS["otp"].sub("otp=[REDACTED]", text)
 
         # Mask emails
         def mask_email(match):
@@ -81,6 +102,50 @@ class SensitiveDataFilter(logging.Filter):
 
         return text
 
+
+# ============================
+# REQUEST CONTEXT (request_id, user_id, ip)
+# ============================
+
+
+_request_id_ctx: ContextVar[Optional[str]] = ContextVar("request_id", default=None)
+_user_id_ctx: ContextVar[Optional[str]] = ContextVar("user_id", default=None)
+_ip_address_ctx: ContextVar[Optional[str]] = ContextVar("ip_address", default=None)
+
+
+def set_request_context(
+    *,
+    request_id: Optional[str] = None,
+    user_id: Optional[str] = None,
+    ip_address: Optional[str] = None,
+) -> Dict[str, Any]:
+    tokens: Dict[str, Any] = {}
+    tokens["request_id"] = _request_id_ctx.set(request_id)
+    tokens["user_id"] = _user_id_ctx.set(user_id)
+    tokens["ip_address"] = _ip_address_ctx.set(ip_address)
+    return tokens
+
+
+def clear_request_context(tokens: Dict[str, Any]) -> None:
+    if not tokens:
+        return
+    _request_id_ctx.reset(tokens.get("request_id"))
+    _user_id_ctx.reset(tokens.get("user_id"))
+    _ip_address_ctx.reset(tokens.get("ip_address"))
+
+
+class RequestContextFilter(logging.Filter):
+    """Inject request-scoped context into each log record."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        if not hasattr(record, "request_id"):
+            record.request_id = _request_id_ctx.get()
+        if not hasattr(record, "user_id"):
+            record.user_id = _user_id_ctx.get()
+        if not hasattr(record, "ip_address"):
+            record.ip_address = _ip_address_ctx.get()
+        return True
+
 # format log
 class JsonFormatter(logging.Formatter):
 
@@ -94,10 +159,35 @@ class JsonFormatter(logging.Formatter):
             "line": record.lineno,
         }
 
-        # Add extra fields if present
-        for key in ["user_id", "transaction_id", "ip_address", "order_id", "event_type", "action", "actor", "target"]:
-            if hasattr(record, key):
-                log_data[key] = getattr(record, key)
+        # Include all non-standard extra fields
+        reserved = {
+            "name",
+            "msg",
+            "args",
+            "levelname",
+            "levelno",
+            "pathname",
+            "filename",
+            "module",
+            "exc_info",
+            "exc_text",
+            "stack_info",
+            "lineno",
+            "funcName",
+            "created",
+            "msecs",
+            "relativeCreated",
+            "thread",
+            "threadName",
+            "processName",
+            "process",
+        }
+        for key, value in record.__dict__.items():
+            if key in reserved or key.startswith("_"):
+                continue
+            if key in log_data:
+                continue
+            log_data[key] = value
 
         if record.exc_info:
             log_data["exception"] = self.formatException(record.exc_info)
@@ -119,8 +209,12 @@ class ColoredFormatter(logging.Formatter):
 
     def format(self, record: logging.LogRecord) -> str:
         color = self.COLORS.get(record.levelname, self.RESET)
-        record.levelname = f"{color}{record.levelname}{self.RESET}"
-        return super().format(record)
+        original_levelname = record.levelname
+        try:
+            record.levelname = f"{color}{record.levelname}{self.RESET}"
+            return super().format(record)
+        finally:
+            record.levelname = original_levelname
 
 
 def setup_file_handler(
@@ -139,6 +233,7 @@ def setup_file_handler(
             '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
         ))
         
+    handler.addFilter(RequestContextFilter())
     handler.addFilter(SensitiveDataFilter())
     return handler
 
@@ -153,6 +248,7 @@ def setup_console_handler(level: int = logging.INFO):
         datefmt='%Y-%m-%d %H:%M:%S'
     )
     handler.setFormatter(formatter)
+    handler.addFilter(RequestContextFilter())
     handler.addFilter(SensitiveDataFilter())
     
     return handler
@@ -185,6 +281,8 @@ def get_logger(
     # Avoid duplicate handlers
     if logger.handlers:
         return logger
+
+    logger.propagate = False
     
     # Add console handler
     if console:
@@ -228,12 +326,14 @@ def get_audit_logger(name: str = 'audit'):
     logger.setLevel(logging.INFO)
     
     # File handler (JSON only, no console)
-    handler = logging.FileHandler(
+    handler = logging.handlers.RotatingFileHandler(
         LOG_FILES['audit'],
-        mode='a',
+        maxBytes=MAX_BYTES,
+        backupCount=BACKUP_COUNT,
         encoding='utf-8'
     )
     handler.setFormatter(JsonFormatter())
+    handler.addFilter(RequestContextFilter())
     handler.addFilter(SensitiveDataFilter())
     logger.addHandler(handler)
     
@@ -326,6 +426,10 @@ def init_logging():
     for log_name, log_file in LOG_FILES.items():
         if not log_file.exists():
             log_file.touch()
-    
-    print(f"✅ Logging initialized: {len(LOG_FILES)} log files ready")
-    print(f"📁 Log directory: {LOG_DIR}")
+
+    # Use standard logging (no prints) so output respects handlers/filters
+    bootstrap_logger = get_application_logger("logging")
+    bootstrap_logger.info(
+        "Logging initialized",
+        extra={"log_dir": str(LOG_DIR), "log_files": {k: str(v) for k, v in LOG_FILES.items()}},
+    )

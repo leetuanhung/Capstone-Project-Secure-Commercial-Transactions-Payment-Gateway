@@ -25,11 +25,9 @@ def verify_stripe_signature(payload: bytes, signature: str):
 
     except ValueError as e:
         logger.error("Webhook payload invalid", exc_info=True)
-        print("Error parsing payload: Invalid JSON.")
         raise HTTPException(status_code=400, detail="Invalid payload")
     except stripe.error.SignatureVerificationError as e:
         logger.error("Webhook signature verification failed", exc_info=True)
-        print("Webhook signature verification failed.")
         raise HTTPException(status_code=400, detail="Invalid signature")
     except Exception as e:
         logger.error(f"Unknown verification error: {str(e)}", exc_info=True)

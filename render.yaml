@@ -1,23 +1,5 @@
 # Render Blueprint for NT219 Payment Gateway
 services:
-  # PostgreSQL Database
-  - type: pserv
-    name: nt219-postgres
-    env: docker
-    plan: free
-    region: singapore
-    disk:
-      name: postgres-data
-      mountPath: /var/lib/postgresql/data
-      sizeGB: 1
-    envVars:
-      - key: POSTGRES_USER
-        value: postgres
-      - key: POSTGRES_PASSWORD
-        generateValue: true
-      - key: POSTGRES_DB
-        value: payment_gateway
-
   # Backend API Service
   - type: web
     name: nt219-backend
@@ -28,23 +10,18 @@ services:
     dockerContext: ./
     healthCheckPath: /health
     envVars:
-      # Database connection
+      # Database connection (External PostgreSQL)
+      # Set these manually in Render Dashboard
       - key: database_hostname
-        fromService:
-          type: pserv
-          name: nt219-postgres
-          property: host
+        sync: false
       - key: database_port
         value: 5432
       - key: database_username
-        value: postgres
+        sync: false
       - key: database_password
-        fromService:
-          type: pserv
-          name: nt219-postgres
-          envVarKey: POSTGRES_PASSWORD
+        sync: false
       - key: database_name
-        value: payment_gateway
+        sync: false
       
       # Application settings
       - key: SECRET_KEY

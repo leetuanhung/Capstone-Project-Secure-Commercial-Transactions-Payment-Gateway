@@ -1,0 +1,83 @@
+flowchart LR
+  %% Tổng quan toàn bộ hệ thống: User/Auth -> Order -> Payment (Fraud/OTP) -> Stripe/Webhook -> DB/Logs
+
+  subgraph Actors["Tác nhân"]
+    U["Người dùng"]
+    ADM["Admin/Operator (tuỳ chọn)"]
+  end
+
+  subgraph FE["Frontend"]
+    UI["Web UI (templates)"]
+  end
+
+  subgraph BE["Backend (FastAPI)"]
+    GW["API Gateway / Router"]
+
+    subgraph MW["Middleware / Security"]
+      M1["Auth (JWT/OAuth2)"]
+      M2["CSRF / CORS"]
+      M3["Rate limiter"]
+      M4["HMAC verifier (webhook)"]
+      M5["Request ID + Logging"]
+    end
+
+    subgraph SVC["Services"]
+      US["User service (Register/Login/Profile)"]
+      OS["Order service (Cart/Order CRUD)"]
+      PS["Payment service (Init/Confirm/Status)"]
+      OTP["OTP service (Request/Verify)"]
+      WH["Webhook handler (Stripe events)"]
+    end
+
+    subgraph SEC["Crypto/Fraud"]
+      ENC["Encryption / E2E crypto"]
+      FD["Fraud detection (ML/rules)"]
+      AUD["PCI auditor (tuỳ chọn)"]
+    end
+  end
+
+  subgraph EXT["Hệ thống ngoài"]
+    STR["Stripe"]
+    MAIL["Email/SMS Provider (OTP)"]
+  end
+
+  subgraph DATA["Lưu trữ"]
+    DB["Database (users/orders/payments)"]
+    LOGS["Logs/Monitoring"]
+  end
+
+  %% Truy cập hệ thống
+  U --> UI --> GW
+  ADM --> GW
+
+  %% Lớp bảo vệ chung
+  GW --> M2 --> M3 --> M5
+
+  %% Auth/User
+  M5 --> M1 --> US --> DB
+
+  %% Order
+  M5 --> OS --> DB
+
+  %% Payment (kèm crypto + fraud + otp)
+  M5 --> PS
+  PS --> ENC
+  PS --> FD
+  FD --> DEC{"Rủi ro cao?"}
+  DEC -->|"Có"| OTP --> MAIL
+  OTP -->|"OTP hợp lệ"| PS
+  DEC -->|"Không"| PS
+
+  %% Stripe + webhook
+  PS --> STR
+  STR -->|"Webhook events"| WH --> M4 --> PS
+
+  %% Persist + feedback
+  PS --> DB
+  DB --> UI
+
+  %% Audit/observability
+  M5 --> LOGS
+  PS --> LOGS
+  WH --> LOGS
+  AUD --> DB

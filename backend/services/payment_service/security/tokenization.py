@@ -157,10 +157,9 @@ class CardTokenizer:
         # Generate cryptographically secure token
         token = f"tok_{secrets.token_urlsafe(32)}"
         
-        # Store encrypted card data (in production, encrypt with HSM)
+        # Store card data in vault (demo). IMPORTANT: never store CVV.
         card_data = {
             'card_number': card_number,
-            'cvv': cvv,
             'expiry': expiry,
             'cardholder_name': cardholder_name,
             'created_at': datetime.utcnow().isoformat(),

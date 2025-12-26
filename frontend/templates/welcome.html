@@ -7,13 +7,8 @@
     <meta http-equiv="refresh" content="3;url=/order_service/orders">
     <title>Đăng nhập thành công - SecureShop</title>
     <script>
-        // Lưu access token và user_id vào localStorage để dùng cho các request sau
-        {% if access_token %}
-        localStorage.setItem('access_token', '{{ access_token }}');
-        {% endif %}
-        {% if user_id %}
-        localStorage.setItem('user_id', '{{ user_id }}');
-        {% endif %}
+        // Intentionally do not persist auth state in localStorage.
+        // Auth is now carried via cookies after login.
     </script>
     
     <style>

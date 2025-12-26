@@ -51,6 +51,23 @@ class OrderItem(Base):
 
     order = relationship("Order", back_populates="items")
 
+
+class PaymentHistory(Base):
+    __tablename__ = "payment_history"
+    id = Column(Integer, primary_key=True, index=True)
+    owner_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+
+    # External / displayed order id used in the UI (e.g. ORD-XXXX, CART-XXXX)
+    external_order_id = Column(String, nullable=False, index=True)
+
+    amount = Column(Integer, nullable=False)
+    currency = Column(String, nullable=False, default="VND")
+    description = Column(String, nullable=True)
+    status = Column(String, nullable=False, default="SUCCESS")
+
+    stripe_transaction_id = Column(String, nullable=True)
+    paid_at = Column(TIMESTAMP(timezone=True), server_default=text("now()"))
+
 class CartItem(Base):
     __tablename__ = "cart_items"
     id = Column(Integer, primary_key=True, index=True)

@@ -179,7 +179,8 @@
         
         <div id="status-message"></div>
         
-        <form id="registerForm">
+        <form id="registerForm" method="post" action="/user_service/register">
+            <input type="hidden" id="csrf_token" name="csrf_token" value="{{ csrf_token | default('', true) }}">
             <div class="input-group">
                 <label for="name">Họ tên</label>
                 <input type="text" id="name" name="name" required placeholder="Nhập họ tên đầy đủ">
@@ -209,7 +210,7 @@
         </form>
         
         <div class="login-link">
-            Đã có tài khoản? <a href="http://127.0.0.1:8000">Đăng nhập</a>
+            Đã có tài khoản? <a href="/">Đăng nhập</a>
         </div>
     </div>
 
@@ -259,7 +260,10 @@
             }
 
             // Prepare form data
+            const csrfToken = document.getElementById('csrf_token')?.value || '';
+
             const formData = new FormData();
+            formData.append('csrf_token', csrfToken);
             formData.append('name', name);
             formData.append('email', email);
             formData.append('phone', phoneDigits);
@@ -271,7 +275,7 @@
             button.disabled = true;
             
             try {
-                const response = await fetch(`${window.location.origin}/auth/register`, {
+                const response = await fetch(`/user_service/register`, {
                     method: 'POST',
                     body: formData
                 });
@@ -304,12 +308,15 @@
                 return;
             }
             
+            const csrfToken = document.getElementById('csrf_token')?.value || '';
+
             const formData = new FormData();
+            formData.append('csrf_token', csrfToken);
             formData.append('email', userEmail);
             formData.append('otp', otpInput);
             
             try {
-                const response = await fetch(`${window.location.origin}/auth/verify-registration-otp`, {
+                const response = await fetch(`/user_service/verify-registration-otp`, {
                     method: 'POST',
                     body: formData
                 });

@@ -6,14 +6,16 @@ from dotenv import load_dotenv
 import stripe
 from sqlalchemy.orm import Session
 from backend.database.database import get_db
-from backend.models.models import User
+from backend.models.models import User, PaymentHistory
 from backend.services.payment_service.security.encryption import AESEncryption
 import os
+import hmac
 import time
 import json
 import traceback
 import hashlib
 import base64
+from typing import Optional
 from backend.config.config import settings
 from backend.services.payment_service.security.hsm_client import (
     sign_data,
@@ -41,6 +43,75 @@ from backend.utils.logger import (
 )
 
 logger = get_transaction_logger(__name__)
+
+
+def _demo_security_apis_enabled() -> bool:
+    return (os.getenv("ENABLE_DEMO_SECURITY_APIS") or "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
+
+def _require_demo_security_apis_enabled() -> None:
+    # Hide these routes by default to avoid accidental PAN/CVV handling in prod.
+    if not _demo_security_apis_enabled():
+        raise HTTPException(status_code=404, detail="Not found")
+
+
+def _stripe_card_summary_from_intent(intent: object) -> Optional[dict]:
+    """Best-effort extraction of non-sensitive card summary from Stripe response."""
+    try:
+        charges = getattr(intent, "charges", None)
+        data = getattr(charges, "data", None) if charges else None
+        if not data:
+            return None
+        charge0 = data[0]
+        pm_details = getattr(charge0, "payment_method_details", None)
+        card = getattr(pm_details, "card", None) if pm_details else None
+        if not card:
+            return None
+
+        last4 = getattr(card, "last4", None)
+        brand = getattr(card, "brand", None)
+        exp_month = getattr(card, "exp_month", None)
+        exp_year = getattr(card, "exp_year", None)
+        if not last4 and not brand:
+            return None
+        return {
+            "masked": f"**** **** **** {last4}" if last4 else None,
+            "brand": brand,
+            "exp_month": exp_month,
+            "exp_year": exp_year,
+        }
+    except Exception:
+        return None
+
+
+def _get_authenticated_user_id(request: Request) -> Optional[int]:
+    """Best-effort auth: Authorization: Bearer <jwt> OR cookie access_token."""
+    token: Optional[str] = None
+
+    auth = request.headers.get("authorization") or request.headers.get("Authorization")
+    if auth and auth.lower().startswith("bearer "):
+        parts = auth.split()
+        if len(parts) == 2:
+            token = parts[1]
+
+    if not token:
+        token = request.cookies.get("access_token")
+
+    if not token:
+        return None
+
+    token_data = verify_access_token(token)
+    if not token_data or getattr(token_data, "id", None) is None:
+        return None
+    try:
+        return int(token_data.id)
+    except Exception:
+        return None
 
 # =========================
 # HELPER FUNCTIONS FOR USER DATA DECRYPTION
@@ -136,6 +207,54 @@ TEMP_CART_ORDER: dict[str, dict] = {}
 router = APIRouter(tags=["Payment Service"])
 
 # =========================
+# CHECKOUT CONTEXT SIGNING (anti-tamper)
+# =========================
+_CHECKOUT_SIGNING_SECRET = os.getenv("CHECKOUT_SIGNING_SECRET") or getattr(
+    settings, "secret_key", ""
+)
+
+
+def _canonical_currency(currency: Optional[str]) -> str:
+    return (currency or "vnd").strip().lower()
+
+
+def _canonical_amount(amount: object) -> str:
+    # Avoid float canonicalization issues: VND is integer in this demo.
+    return str(int(amount))
+
+
+def _checkout_sig_payload(order_id: str, amount: object, currency: Optional[str]) -> bytes:
+    # Stable, unambiguous payload
+    return f"{order_id}|{_canonical_amount(amount)}|{_canonical_currency(currency)}".encode(
+        "utf-8"
+    )
+
+
+def _sign_checkout_context(order_id: str, amount: object, currency: Optional[str]) -> str:
+    if not _CHECKOUT_SIGNING_SECRET:
+        # Should never happen, but keep behavior explicit.
+        raise RuntimeError("CHECKOUT_SIGNING_SECRET/settings.secret_key not configured")
+    payload = _checkout_sig_payload(order_id, amount, currency)
+    return hmac.new(
+        _CHECKOUT_SIGNING_SECRET.encode("utf-8"), payload, hashlib.sha256
+    ).hexdigest()
+
+
+def _verify_checkout_context_sig(sig: str, order_id: str, amount: object, currency: Optional[str]) -> bool:
+    try:
+        expected = _sign_checkout_context(order_id, amount, currency)
+    except Exception:
+        return False
+    return hmac.compare_digest((sig or "").strip(), expected)
+
+
+def _get_order_by_id(order_id: str) -> Optional[dict]:
+    order = next((o for o in MOCK_ORDERS if o.get("id") == order_id), None)
+    if order:
+        return order
+    return TEMP_CART_ORDER.get(order_id)
+
+# =========================
 # KHỞI TẠO FRAUD DETECTOR
 # =========================
 fraud_detector = FraudDetector()
@@ -209,6 +328,7 @@ async def tokenize_card(
     cardholder_name: str = Form(...),
 ):
     """Nhận dữ liệu thẻ và trả về token cùng số thẻ đã che (demo học tập)."""
+    _require_demo_security_apis_enabled()
     try:
         result = card_tokenizer.generate_token(
             card_number, cvv, expiry, cardholder_name
@@ -227,6 +347,7 @@ async def tokenize_card(
 @router.get("/security/token_info")
 async def token_info(token: str):
     """Trả về thông tin an toàn về token (KHÔNG trả số thẻ gốc)."""
+    _require_demo_security_apis_enabled()
     try:
         data = card_tokenizer.detokenize(token)
         masked = DataMasking.mask_card_number(data["card_number"]) if data else None
@@ -237,6 +358,7 @@ async def token_info(token: str):
 
 @router.post("/security/delete_token")
 async def delete_token(token: str = Form(...)):
+    _require_demo_security_apis_enabled()
     ok = card_tokenizer.delete_token(token)
     if not ok:
         raise HTTPException(status_code=404, detail="Token not found")
@@ -250,10 +372,17 @@ async def checkout_single_order(request: Request, order_id: str, db: Session = D
         raise HTTPException(status_code=404, detail="Order not found")
 
     order["currency"] = order.get("currency", "vnd").lower()
+
+    checkout_sig = _sign_checkout_context(order["id"], order.get("amount"), order.get("currency"))
     
     return templates.TemplateResponse(
         "checkout.html",
-        {"request": request, "order": order, "stripe_public_key": STRIPE_PUBLIC_KEY},
+        {
+            "request": request,
+            "order": order,
+            "checkout_sig": checkout_sig,
+            "stripe_public_key": STRIPE_PUBLIC_KEY,
+        },
     )
 
 
@@ -274,11 +403,18 @@ async def checkout_cart(request: Request, db: Session = Depends(get_db)):
         "status": "PENDING",
     }
 
+    checkout_sig = _sign_checkout_context(
+        TEMP_CART_ORDER[order_id]["id"],
+        TEMP_CART_ORDER[order_id].get("amount"),
+        TEMP_CART_ORDER[order_id].get("currency"),
+    )
+
     return templates.TemplateResponse(
         "checkout.html",
         {
             "request": request,
             "order": TEMP_CART_ORDER[order_id],
+            "checkout_sig": checkout_sig,
             "stripe_public_key": STRIPE_PUBLIC_KEY,
         },
     )
@@ -288,9 +424,10 @@ async def checkout_cart(request: Request, db: Session = Depends(get_db)):
 async def request_otp(
     request: Request,
     order_id: str = Form(...),
-    amount: float = Form(...),
+    checkout_sig: str = Form(...),
+    amount: Optional[float] = Form(None),
     currency: str = Form(default="vnd"),
-    user_id: int = Form(...),
+    user_id: Optional[int] = Form(None),
     db: Session = Depends(get_db),
 ):
     """
@@ -306,18 +443,58 @@ async def request_otp(
     print("🎯 REQUEST_OTP endpoint called!")
     print(f"   user_id: {user_id}")
     print(f"   order_id: {order_id}")
-    print(f"   amount: {amount}")
-    print(f"   currency: {currency}")
+    print(f"   amount(client): {amount}")
+    print(f"   currency(client): {currency}")
     print("="*60)
     
     if not otp_service:
         return {"success": False, "message": "OTP service not available"}
 
-    if not user_id:
-        return {"success": False, "message": "Vui lòng đăng nhập để tiếp tục thanh toán"}
+    auth_user_id = _get_authenticated_user_id(request)
+    if not auth_user_id:
+        return JSONResponse(
+            status_code=401,
+            content={"success": False, "message": "Vui lòng đăng nhập để tiếp tục thanh toán"},
+        )
+
+    if user_id is not None and int(user_id) != int(auth_user_id):
+        log_security_event(
+            event_type="idor_blocked",
+            severity="warning",
+            user_id=str(auth_user_id),
+            ip_address=request.client.host if request.client else None,
+            details={"endpoint": "request_otp", "submitted_user_id": int(user_id)},
+        )
+        return JSONResponse(
+            status_code=403,
+            content={
+                "success": False,
+                "message": "Forbidden: user mismatch. Please logout/login and clear stale localStorage/cookies.",
+            },
+        )
+
+    order = _get_order_by_id(order_id)
+    if not order:
+        return JSONResponse(
+            status_code=404,
+            content={"success": False, "message": "Order not found"},
+        )
+
+    # Always derive amount/currency from server-side order data
+    order_currency = _canonical_currency(order.get("currency"))
+    order_amount = int(order.get("amount") or 0)
+
+    if not _verify_checkout_context_sig(checkout_sig, order_id, order_amount, order_currency):
+        return JSONResponse(
+            status_code=400,
+            content={
+                "success": False,
+                "message": "Dữ liệu đơn hàng không hợp lệ (order_id bị thay đổi). Vui lòng tải lại trang checkout.",
+            },
+        )
 
     # Tìm user trong database
-    user = db.query(User).filter(User.id == user_id).first()
+    user = db.query(User).filter(User.id == int(auth_user_id)).first()
     if not user:
         return {"success": False, "message": "Không tìm thấy thông tin người dùng"}
 
@@ -327,7 +504,7 @@ async def request_otp(
         return {"success": False, "message": "Lỗi xử lý thông tin người dùng"}
 
     # Gửi OTP
-    otp = otp_service.send_otp(email, amount, currency, order_id)
+    otp = otp_service.send_otp(email, float(order_amount), order_currency, order_id)
 
     if otp:
         return {
@@ -348,9 +525,10 @@ async def verify_otp(
     request: Request,
     otp: str = Form(...),
     order_id: str = Form(...),
-    amount: float = Form(...),
+    checkout_sig: str = Form(...),
+    amount: Optional[float] = Form(None),
     currency: str = Form(default="vnd"),
-    user_id: int = Form(...),
+    user_id: Optional[int] = Form(None),
     db: Session = Depends(get_db),
 ):
     """
@@ -371,15 +549,49 @@ async def verify_otp(
             content={"success": False, "error": "OTP service not available"},
         )
 
-    # Lấy user_id từ form data
-    if not user_id:
+    auth_user_id = _get_authenticated_user_id(request)
+    if not auth_user_id:
         return JSONResponse(
             status_code=401,
             content={"success": False, "error": "Vui lòng đăng nhập để tiếp tục"},
         )
 
+    if user_id is not None and int(user_id) != int(auth_user_id):
+        log_security_event(
+            event_type="idor_blocked",
+            severity="warning",
+            user_id=str(auth_user_id),
+            ip_address=request.client.host if request.client else None,
+            details={"endpoint": "verify_otp", "submitted_user_id": int(user_id)},
+        )
+        return JSONResponse(
+            status_code=403,
+            content={
+                "success": False,
+                "error": "Forbidden: user mismatch. Please logout/login and clear stale localStorage/cookies.",
+            },
+        )
+
+    order = _get_order_by_id(order_id)
+    if not order:
+        return JSONResponse(
+            status_code=404,
+            content={"success": False, "error": "Order not found"},
+        )
+
+    order_currency = _canonical_currency(order.get("currency"))
+    order_amount = int(order.get("amount") or 0)
+    if not _verify_checkout_context_sig(checkout_sig, order_id, order_amount, order_currency):
+        return JSONResponse(
+            status_code=400,
+            content={
+                "success": False,
+                "error": "Dữ liệu đơn hàng không hợp lệ (order_id bị thay đổi). Vui lòng tải lại trang checkout.",
+            },
+        )
+
     # Tìm user trong database
-    user = db.query(User).filter(User.id == user_id).first()
+    user = db.query(User).filter(User.id == int(auth_user_id)).first()
     if not user:
         return JSONResponse(
             status_code=404,
@@ -418,10 +630,11 @@ async def create_payment(
     request: Request,
     payment_token: str = Form(...),
     order_id: str = Form(...),
+    checkout_sig: str = Form(...),
     nonce: str = Form(...),
     device_fingerprint: str = Form(...),
     otp: str = Form(...),  # OTP code from user - BẮT BUỘC
-    user_id: int = Form(None),  # User ID nếu đã login
+    user_id: Optional[int] = Form(None),  # Optional; validated against JWT
     db: Session = Depends(get_db),
 ):
     # Log initial payment request safely (handle missing client)
@@ -432,12 +645,22 @@ async def create_payment(
 
     global TEMP_CART_ORDER, CART
 
-    order = next((o for o in MOCK_ORDERS if o["id"] == order_id), None)
-    if not order:
-        order = TEMP_CART_ORDER.get(order_id)
+    order = _get_order_by_id(order_id)
     if not order:
         return templates.TemplateResponse(
             "error.html", {"request": request, "error": "Order not found"}
+        )
+
+    # Enforce anti-tamper signature: prevents swapping order_id to change amount
+    order_currency = _canonical_currency(order.get("currency"))
+    order_amount = int(order.get("amount") or 0)
+    if not _verify_checkout_context_sig(checkout_sig, order_id, order_amount, order_currency):
+        return templates.TemplateResponse(
+            "error.html",
+            {
+                "request": request,
+                "error": "Invalid checkout context. Please reload checkout page.",
+            },
         )
 
     logger.info(
@@ -488,8 +711,8 @@ async def create_payment(
             },
         )
     
-    # Lấy user_id từ form data
-    if not user_id:
+    auth_user_id = _get_authenticated_user_id(request)
+    if not auth_user_id:
         return templates.TemplateResponse(
             "error.html",
             {
@@ -497,9 +720,26 @@ async def create_payment(
                 "error": "❌ Vui lòng đăng nhập để tiếp tục thanh toán!",
             },
         )
+
+    if user_id is not None and int(user_id) != int(auth_user_id):
+        log_security_event(
+            event_type="idor_blocked",
+            severity="warning",
+            user_id=str(auth_user_id),
+            ip_address=request.client.host if request.client else None,
+            details={"endpoint": "create_payment", "submitted_user_id": int(user_id)},
+        )
+        return templates.TemplateResponse(
+            "error.html",
+            {
+                "request": request,
+                "error": "❌ Forbidden: user mismatch. Please logout/login and clear stale localStorage/cookies.",
+            },
+            status_code=403,
+        )
     
     # Tìm user trong database để lấy email
-    user = db.query(User).filter(User.id == user_id).first()
+    user = db.query(User).filter(User.id == int(auth_user_id)).first()
     if not user:
         return templates.TemplateResponse(
             "error.html",
@@ -550,56 +790,19 @@ async def create_payment(
     # =========================
     client_ip = request.client.host if request.client else None
 
-    # Lấy user từ form user_id hoặc từ JWT token (ưu tiên form trước)
+    # Authenticated user is already required above; load user for fraud attribution.
     user_db = None
-
-    # Cách 1: Lấy từ form user_id (đơn giản nhất)
-    if user_id:
-        try:
-            user_db = (
-                db.query(db_models.User).filter(db_models.User.id == user_id).first()
-            )
-            if user_db:
-                print(f"✅ User authenticated from form: id={user_db.id}")
-        except Exception as e:
-            print(f"⚠️ Error querying user by id: {e}")
-
-    # Cách 2: Fallback - thử lấy từ JWT token nếu không có user_id trong form
-    if not user_db:
-        try:
-            auth = request.headers.get("authorization") or request.headers.get(
-                "Authorization"
-            )
-            if auth and auth.lower().startswith("bearer "):
-                token = auth.split()[1]
-                try:
-                    token_data = verify_access_token(
-                        token,
-                        HTTPException(
-                            status_code=401, detail="could not validate credentials"
-                        ),
-                    )
-                    user_db = (
-                        db.query(db_models.User)
-                        .filter(db_models.User.id == token_data.id)
-                        .first()
-                    )
-                    if user_db:
-                        print(f"✅ User authenticated from JWT: id={user_db.id}")
-                except Exception as e:
-                    print(f"⚠️ Token verification failed: {e}")
-        except Exception as e:
-            print(f"⚠️ Error reading Authorization header: {e}")
-
-    if not user_db:
-        print("⚠️ User not authenticated - no user_id in form and no valid JWT token")
+    try:
+        user_db = db.query(db_models.User).filter(db_models.User.id == int(auth_user_id)).first()
+    except Exception as e:
+        print(f"⚠️ Error querying user by id: {e}")
 
     try:
         # Lấy thông tin client
         client_ip = request.client.host if request.client else None
 
         # Lấy user_id để sử dụng trong fraud detection
-        fraud_user_id = str(user_db.id) if user_db else str(user_id) if user_id else order_id
+        fraud_user_id = str(user_db.id) if user_db else str(auth_user_id)
 
         # Tạo transaction input để kiểm tra
         fraud_check = TransactionInput(
@@ -693,17 +896,8 @@ async def create_payment(
         )
 
         if intent.status == "succeeded":
-            masked_card = None
-            
-            try:
-                # Get masked card from payment token if possible
-                token_data = card_tokenizer.detokenize(payment_token)
-                if token_data:
-                    masked_card = DataMasking.mask_card_number(
-                        token_data.get("card_number", "")
-                    )
-            except Exception:
-                masked_card = "***"
+            card_summary = _stripe_card_summary_from_intent(intent) or {}
+            masked_card = card_summary.get("masked")
 
             log_payment_attempt(
                 transaction_id=intent.id,
@@ -726,6 +920,27 @@ async def create_payment(
                 },
             )
             order["status"] = "SUCCESS"
+
+            # Persist customer history to DB (shown next to cart)
+            try:
+                if auth_user_id:
+                    db.add(
+                        PaymentHistory(
+                            owner_id=int(auth_user_id),
+                            external_order_id=str(order_id),
+                            amount=int(order.get("amount") or 0),
+                            currency=str(order.get("currency") or "VND"),
+                            description=str(order.get("description") or ""),
+                            status="SUCCESS",
+                            stripe_transaction_id=str(intent.id),
+                        )
+                    )
+                    db.commit()
+            except Exception:
+                try:
+                    db.rollback()
+                except Exception:
+                    pass
 
             # ✅ Tạo nonce an toàn từ HSM (fallback phần mềm nếu HSM không khả dụng)
             try:

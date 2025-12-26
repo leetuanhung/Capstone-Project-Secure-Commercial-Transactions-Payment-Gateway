@@ -59,7 +59,7 @@
                                style="letter-spacing: 0.5em; font-size: 1.5rem;"
                                required>
                         <small class="form-text text-muted">
-                            <i class="fas fa-clock"></i> Mã có hiệu lực trong <span id="otpTimer">5:00</span> phút
+                            <i class="fas fa-clock"></i> Mã có hiệu lực trong <span id="otpTimer">1:00</span> phút
                         </small>
                     </div>
                     
@@ -105,6 +105,18 @@
 </style>
 
 <script>
+function getCookie(name) {
+    const value = `; ${document.cookie}`;
+    const parts = value.split(`; ${name}=`);
+    if (parts.length === 2) return parts.pop().split(';').shift();
+    return null;
+}
+
+function withCsrf(headers) {
+    const token = getCookie('csrf_token');
+    if (token) headers['X-CSRF-Token'] = token;
+    return headers;
+}
 // OTP Modal Logic
 let otpTimerInterval = null;
 let currentEmail = '';
@@ -153,6 +165,7 @@ document.getElementById('sendOtpBtn').addEventListener('click', async function()
         
         const response = await fetch('/payment_service/request_otp', {
             method: 'POST',
+            headers: withCsrf({}),
             body: formData
         });
         
@@ -165,7 +178,7 @@ document.getElementById('sendOtpBtn').addEventListener('click', async function()
             document.getElementById('sentEmail').textContent = email;
             
             // Start countdown timer
-            startOTPTimer(300); // 5 minutes
+            startOTPTimer(60); // 1 minute
         } else {
             alert(result.message || 'Không thể gửi OTP. Vui lòng thử lại.');
             document.getElementById('otpLoading').style.display = 'none';
@@ -221,6 +234,9 @@ function startOTPTimer(seconds) {
             clearInterval(otpTimerInterval);
             timerElement.textContent = 'Hết hạn';
             document.getElementById('verifyOtpBtn').disabled = true;
+
+            // Auto logout after 5 minutes on OTP step
+            window.location.href = '/user_service/logout';
         }
         
         timeLeft--;

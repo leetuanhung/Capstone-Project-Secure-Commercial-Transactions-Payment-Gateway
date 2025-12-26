@@ -383,8 +383,8 @@ window.onload = function() {
 
     <p class="message-box"></p>
 
-    <!-- ✅ ĐÃ SỬA ACTION THÀNH /auth/login -->
-    <form action="/auth/auth/login" method="post">
+    <form action="/user_service/login" method="post">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token | default('', true) }}">
       <div class="input-group">
         <label for="username">Tên đăng nhập hoặc Email</label>
         <div class="input-wrapper">
@@ -405,7 +405,7 @@ window.onload = function() {
     </form>
 
     <div class="register-link">
-      Chưa có tài khoản? <a href="/auth/auth/register">Đăng ký</a>
+      Chưa có tài khoản? <a href="/user_service/register">Đăng ký</a>
     </div>
   </div>
     <div id="template-error" style="display: none;">{{ error | default("", true) }}</div>

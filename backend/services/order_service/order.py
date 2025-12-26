@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from typing import List
 from backend.database.database import get_db
 from backend.models.models import Order, OrderItem, Product, CartItem
+from backend.models.models import PaymentHistory
 from backend.schemas.order import OrderCreate, OrderResponse, CartItemResponse
 from fastapi import APIRouter, Form, Request, HTTPException, FastAPI
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -10,6 +11,8 @@ from fastapi.templating import Jinja2Templates
 from pathlib import Path
 import secrets
 from backend.utils.logger import get_application_logger
+from backend.oauth2 import oauth2
+from sqlalchemy import desc
 # -- KHỞI TẠO --
 app = FastAPI(title="order Service")
 router = APIRouter()
@@ -66,8 +69,21 @@ CART = []
 # -- ROUTES --
 
 
+def _require_login(request: Request) -> bool:
+    auth_header = request.headers.get("Authorization")
+    token = None
+    if auth_header and auth_header.startswith("Bearer "):
+        token = auth_header.split(" ", 1)[1]
+    else:
+        token = request.cookies.get("access_token")
+    return bool(token and oauth2.verify_access_token(token))
+
+
 @router.get("/orders", response_class=HTMLResponse)
 async def list_orders(request: Request):
+    if not _require_login(request):
+        return RedirectResponse(url="/user_service/login", status_code=303)
+
     logger.info(
         "Orders page accessed",
         extra={"ip": request.client.host}
@@ -89,16 +105,48 @@ async def add_to_cart(order_id: str):
     return RedirectResponse(url="/order_service/orders", status_code=303)
 
 @router.get("/cart", response_class=HTMLResponse, tags=["Cart"])
-async def view_cart(request: Request):
+async def view_cart(request: Request, db: Session = Depends(get_db)):
+    if not _require_login(request):
+        return RedirectResponse(url="/user_service/login", status_code=303)
+
+    cookie_user_id = request.cookies.get("user_id")
+    history: list[dict] = []
+    try:
+        if cookie_user_id:
+            user_id_int = int(cookie_user_id)
+            rows = (
+                db.query(PaymentHistory)
+                .filter(PaymentHistory.owner_id == user_id_int)
+                .order_by(desc(PaymentHistory.paid_at))
+                .limit(20)
+                .all()
+            )
+            history = [
+                {
+                    "id": r.external_order_id,
+                    "amount": r.amount,
+                    "currency": r.currency,
+                    "description": r.description,
+                    "status": r.status,
+                    "paid_at": (r.paid_at.isoformat(sep=" ", timespec="seconds") if r.paid_at else ""),
+                }
+                for r in rows
+            ]
+    except Exception:
+        history = []
     total = sum(item["amount"] for item in CART)
     return template.TemplateResponse("cart.html", {
         "request": request,
         "cart": CART,
-        "total": total
+        "total": total,
+        "history": history,
     })
 
 @router.get("/remove_from_cart", tags=["Cart"])
 async def remove_from_cart(order_id:str):
+    # Keep this consistent with other cart operations
+    # (public access here would still look like a 'logged-in' session).
+    # Note: cannot take Request in signature without changing route shape.
     global CART
     CART = [item for item in CART if item["id"] != order_id]
     return RedirectResponse(url="/order_service/cart", status_code=303)

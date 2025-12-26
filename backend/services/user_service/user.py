@@ -16,6 +16,7 @@ from backend.database.database import get_db, SessionLocal
 from backend.models.models import User
 from backend.schemas import user
 from backend.utils import crypto
+from backend.utils import csrf
 from backend.oauth2 import oauth2
 from backend.services.payment_service.security.encryption import AESEncryption
 from backend.services.payment_service.otp_service import OTPService
@@ -29,7 +30,9 @@ from backend.utils.logger import(
 
 logger = get_security_logger()
 
-router = APIRouter(prefix="/auth", tags=["Authentication"])
+# Router prefix is intentionally empty.
+# The app mounts this router under both `/auth` and `/user_service` in `backend/main.py`.
+router = APIRouter(tags=["Authentication"])
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent.parent
 templates = Jinja2Templates(directory=str(BASE_DIR / "frontend" / "templates"))
@@ -216,10 +219,43 @@ def ensure_user_security_setup() -> None:
 @router.post("/login", response_class=HTMLResponse)
 async def login_post(
     request: Request,
-    username: str = Form(...),
-    password: str = Form(...),
+    csrf_token: Optional[str] = Form(None),
+    username: Optional[str] = Form(None),
+    password: Optional[str] = Form(None),
     db: Session = Depends(get_db)
 ):
+    # Defensive: some browsers/proxies can trigger a POST without a body
+    # (e.g., refresh/retry or redirect edge cases). Avoid FastAPI 422.
+    if not csrf_token or not username or not password:
+        page_token = csrf.ensure_csrf_token(request)
+        response = templates.TemplateResponse(
+            "login.html",
+            {
+                "request": request,
+                "error": "Thiếu dữ liệu đăng nhập. Vui lòng nhập lại.",
+                "csrf_token": page_token,
+            },
+        )
+        csrf.set_csrf_cookie(response, request, page_token)
+        response.headers["Cache-Control"] = "no-store"
+        return response
+
+    try:
+        csrf.validate_csrf(request, csrf_token)
+    except Exception:
+        new_token = csrf.generate_csrf_token()
+        response = templates.TemplateResponse(
+            "login.html",
+            {
+                "request": request,
+                "error": "CSRF token không hợp lệ. Vui lòng tải lại trang và thử lại.",
+                "csrf_token": new_token,
+            },
+        )
+        csrf.set_csrf_cookie(response, request, new_token)
+        response.headers["Cache-Control"] = "no-store"
+        return response
+
     try:
         logger.info(
             'Login attempt',
@@ -228,10 +264,15 @@ async def login_post(
         user_db = _get_user_by_identifier(username, db)
     except RuntimeError as exc:
         db.rollback()
-        return templates.TemplateResponse("login.html", {
+        page_token = csrf.ensure_csrf_token(request)
+        response = templates.TemplateResponse("login.html", {
             "request": request,
-            "error": str(exc)
+            "error": str(exc),
+            "csrf_token": page_token,
         })
+        csrf.set_csrf_cookie(response, request, page_token)
+        response.headers["Cache-Control"] = "no-store"
+        return response
 
     if not user_db:
         
@@ -242,10 +283,15 @@ async def login_post(
             ip_address=request.client.host,
             details={'username': username, 'reason': 'user_not_found'}
         )
-        return templates.TemplateResponse("login.html", {
+        page_token = csrf.ensure_csrf_token(request)
+        response = templates.TemplateResponse("login.html", {
             "request": request,
-            "error": "Thông tin đăng nhập không đúng"
+            "error": "Thông tin đăng nhập không đúng",
+            "csrf_token": page_token,
         })
+        csrf.set_csrf_cookie(response, request, page_token)
+        response.headers["Cache-Control"] = "no-store"
+        return response
 
     is_valid = crypto.verify(password, user_db.password)
 
@@ -259,10 +305,15 @@ async def login_post(
             details={'reason': 'invalid_password'}
         )
         
-        return templates.TemplateResponse("login.html", {
+        page_token = csrf.ensure_csrf_token(request)
+        response = templates.TemplateResponse("login.html", {
             "request": request,
-            "error": "Email hoặc mật khẩu không đúng"
+            "error": "Email hoặc mật khẩu không đúng",
+            "csrf_token": page_token,
         })
+        csrf.set_csrf_cookie(response, request, page_token)
+        response.headers["Cache-Control"] = "no-store"
+        return response
 
     display_name = _decrypt_value(user_db.name_encrypted, _name_aad(user_db.name)) or _normalize(username)
     access_token = oauth2.create_access_token(data={"user_id": user_db.id})
@@ -276,23 +327,113 @@ async def login_post(
     )
     logger.info(f"User {user_db.id} logged in successfully")
 
-    return templates.TemplateResponse("welcome.html", {
-        "request": request,
-        "username": display_name,
-        "access_token": access_token,
-        "user_id": user_db.id
-    })
+    response = RedirectResponse(url="/user_service/welcome", status_code=303)
+    secure_cookie = csrf.is_https_request(request)
+
+    # Standard practice: store auth in cookies (avoid returning a post body for /login).
+    response.set_cookie(
+        key="access_token",
+        value=access_token,
+        httponly=True,
+        secure=secure_cookie,
+        samesite="lax",
+        path="/",
+    )
+    response.set_cookie(
+        key="user_id",
+        value=str(user_db.id),
+        httponly=False,
+        secure=secure_cookie,
+        samesite="lax",
+        path="/",
+    )
+    response.set_cookie(
+        key="display_name",
+        value=display_name,
+        httponly=False,
+        secure=secure_cookie,
+        samesite="lax",
+        path="/",
+    )
+
+    response.headers["Cache-Control"] = "no-store"
+
+    # Rotate CSRF token after login (common best practice).
+    new_csrf = csrf.generate_csrf_token()
+    csrf.set_csrf_cookie(response, request, new_csrf)
+    return response
+
+
+@router.get("/login", response_class=HTMLResponse)
+async def login_get(request: Request):
+    # Always render login form for GET /login.
+    page_token = csrf.ensure_csrf_token(request)
+    response = templates.TemplateResponse(
+        "login.html",
+        {"request": request, "error": None, "csrf_token": page_token},
+    )
+    csrf.set_csrf_cookie(response, request, page_token)
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
+def _logout_response(request: Request) -> RedirectResponse:
+    response = RedirectResponse(url="/user_service/login", status_code=303)
+
+    for cookie_name in ("access_token", "user_id", "display_name", csrf.CSRF_COOKIE_NAME):
+        response.delete_cookie(cookie_name, path="/")
+
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
+@router.post("/logout")
+async def logout_post(request: Request):
+    return _logout_response(request)
+
+
+@router.get("/logout")
+async def logout_get(request: Request):
+    return _logout_response(request)
+
+
+@router.get("/welcome", response_class=HTMLResponse)
+async def welcome_get(request: Request):
+    token = request.cookies.get("access_token")
+    if not token or not oauth2.verify_access_token(token):
+        return RedirectResponse(url="/user_service/login", status_code=303)
+
+    # Render welcome page after PRG redirect. Do not embed tokens in HTML.
+    display_name = request.cookies.get("display_name")
+    user_id = request.cookies.get("user_id")
+
+    response = templates.TemplateResponse(
+        "welcome.html",
+        {
+            "request": request,
+            "username": display_name or "",
+            "access_token": None,
+            "user_id": user_id,
+        },
+    )
+    response.headers["Cache-Control"] = "no-store"
+    return response
 
 @router.get("/register", response_class=HTMLResponse)
 async def register_get(request: Request):
-    return templates.TemplateResponse("register.html", {
-        "request": request, 
-        "error": None
-    })
+    page_token = csrf.ensure_csrf_token(request)
+    response = templates.TemplateResponse(
+        "register.html",
+        {"request": request, "error": None, "csrf_token": page_token},
+    )
+    csrf.set_csrf_cookie(response, request, page_token)
+    response.headers["Cache-Control"] = "no-store"
+    return response
 
 @router.post("/register", response_class=JSONResponse)
 async def register_post(
     request: Request,
+    csrf_token: str = Form(...),
     name: str = Form(...),
     email: str = Form(...),
     phone: str = Form(...),
@@ -300,6 +441,17 @@ async def register_post(
     confirm_password: str = Form(...),
     db: Session = Depends(get_db)
 ):
+    try:
+        csrf.validate_csrf(request, csrf_token)
+    except Exception:
+        new_token = csrf.generate_csrf_token()
+        response = JSONResponse(
+            status_code=403,
+            content={"success": False, "error": "CSRF token không hợp lệ. Vui lòng tải lại trang."},
+        )
+        csrf.set_csrf_cookie(response, request, new_token)
+        response.headers["Cache-Control"] = "no-store"
+        return response
     
     normalized_name = _normalize(name)
     normalized_email = _normalize(email).lower()
@@ -333,7 +485,7 @@ async def register_post(
                     content={"success": False, "error": str(exc)}
                 )
     if exists_email:
-        print("ERROR: Email already exists")
+        logger.warning("Registration attempted with existing email")
         return JSONResponse(
             status_code=400,
             content={"success": False, "error": "Email đã tồn tại"}
@@ -354,21 +506,21 @@ async def register_post(
                     content={"success": False, "error": str(exc)}
                 )
     if exists_phone:
-        print("ERROR: Phone already exists")
+        logger.warning("Registration attempted with existing phone")
         return JSONResponse(
             status_code=400,
             content={"success": False, "error": "Số điện thoại đã tồn tại"}
         )
     
     if password != confirm_password:
-        print("ERROR: Passwords don't match")
+        logger.info("Registration rejected: password mismatch")
         return JSONResponse(
             status_code=400,
             content={"success": False, "error": "Mật khẩu không khớp"}
         )
     
     if len(password) < 6:
-        print("ERROR: Password too short")
+        logger.info("Registration rejected: password too short")
         return JSONResponse(
             status_code=400,
             content={"success": False, "error": "Mật khẩu phải có ít nhất 6 ký tự"}
@@ -418,7 +570,7 @@ async def register_post(
                 otp_service._registration_storage = {}
             otp_service._registration_storage[reg_key] = registration_data
         
-        print(f"✅ OTP sent to {normalized_email}, waiting for verification")
+        logger.info("Registration OTP sent")
         return JSONResponse(
             content={
                 "success": True,
@@ -428,9 +580,7 @@ async def register_post(
         )
         
     except Exception as e:
-        print(f"ERROR: {str(e)}")
-        import traceback
-        traceback.print_exc()
+        logger.exception("Registration OTP send failed")
         return JSONResponse(
             status_code=500,
             content={"success": False, "error": f"Lỗi server: {str(e)}"}
@@ -440,12 +590,14 @@ async def register_post(
 @router.post("/verify-registration-otp", response_class=JSONResponse)
 async def verify_registration_otp(
     request: Request,
+    csrf_token: str = Form(...),
     email: str = Form(...),
     otp: str = Form(...),
     db: Session = Depends(get_db)
 ):
     """Xác thực OTP và hoàn tất đăng ký tài khoản"""
     try:
+        csrf.validate_csrf(request, csrf_token)
         normalized_email = _normalize(email).lower()
         is_valid = otp_service.verify_registration_otp(normalized_email, otp)
         if not is_valid:
@@ -461,7 +613,7 @@ async def verify_registration_otp(
                     registration_data = json.loads(data_json)
                     otp_service.redis_client.delete(reg_key)
             except Exception as e:
-                print(f"⚠️ Redis get failed: {e}")
+                logger.warning("Redis get failed during registration OTP verify", exc_info=True)
         
         if not registration_data and hasattr(otp_service, '_registration_storage'):
             if reg_key in otp_service._registration_storage:
@@ -495,14 +647,12 @@ async def verify_registration_otp(
         db.add(new_user)
         db.commit()
         db.refresh(new_user)
-        print(f"✅ User registered successfully: {normalized_email}")
+        logger.info("User registered successfully", extra={"user_id": str(new_user.id)})
         
         return JSONResponse(content={"success": True, "message": "Đăng ký tài khoản thành công! Bạn có thể đăng nhập ngay.", "redirect": "/"})
     
     except Exception as e:
-        print(f"ERROR in verify_registration_otp: {str(e)}")
-        import traceback
-        traceback.print_exc()
+        logger.exception("Error in verify_registration_otp")
         db.rollback()
         return JSONResponse(status_code=500, content={"success": False, "error": f"Lỗi server: {str(e)}"})
 
@@ -538,11 +688,9 @@ async def get_user_info(user_id: int, db: Session = Depends(get_db)):
                 "email_verified": user.email_verified
             })
         except Exception as decrypt_error:
-            print(f"❌ Error decrypting email for user {user_id}: {decrypt_error}")
+            logger.exception("Error decrypting email for user", extra={"user_id": str(user_id)})
             return JSONResponse(status_code=500, content={"error": "Failed to decrypt user email"})
             
     except Exception as e:
-        print(f"❌ Error in get_user_info: {str(e)}")
-        import traceback
-        traceback.print_exc()
+        logger.exception("Error in get_user_info", extra={"user_id": str(user_id)})
         return JSONResponse(status_code=500, content={"error": f"Server error: {str(e)}"})

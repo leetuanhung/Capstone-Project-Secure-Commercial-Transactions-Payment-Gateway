@@ -17,7 +17,7 @@ services:
       retries: 5
 
   backend:
-    build: ./backend
+    build: .
     container_name: nt219_backend
     # Remove direct port exposure - nginx will proxy to internal port 8000
     expose:
@@ -31,10 +31,12 @@ services:
     volumes:
       - ./backend:/app/backend
       - ./frontend:/app/frontend
+      - ./logs:/app/logs
     command: uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
     depends_on:
       db:
         condition: service_healthy
+    restart: unless-stopped
 
   nginx:
     image: nginx:stable-alpine
