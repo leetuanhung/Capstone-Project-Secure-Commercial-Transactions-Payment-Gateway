@@ -106,10 +106,15 @@ def _get_authenticated_user_id(request: Request) -> Optional[int]:
         return None
 
     token_data = verify_access_token(token)
-    if not token_data or getattr(token_data, "id", None) is None:
+    user_id = None
+    if token_data:
+        user_id = getattr(token_data, "id", None)
+        if user_id is None:
+            user_id = getattr(token_data, "user_id", None)
+    if not token_data or user_id is None:
         return None
     try:
-        return int(token_data.id)
+        return int(user_id)
     except Exception:
         return None
 
@@ -700,16 +705,80 @@ async def create_payment(
         print(f"⚠️ Nonce validation error: {e}")
 
     # =========================
-    # 🔐 OTP VERIFICATION - BẮT BUỘC
+    # 🛡️ FRAUD DETECTION CHECK
     # =========================
-    if not otp:
-        return templates.TemplateResponse(
-            "error.html",
-            {
-                "request": request,
-                "error": "❌ Vui lòng nhập mã OTP để xác thực thanh toán!",
+    client_ip = request.client.host if request.client else None
+    auth_user_id = _get_authenticated_user_id(request)
+    user_db = db.query(db_models.User).filter(db_models.User.id == int(auth_user_id)).first() if auth_user_id else None
+    fraud_user_id = str(user_db.id) if user_db else str(auth_user_id)
+    fraud_check = TransactionInput(
+        user_id=fraud_user_id,
+        amount=(float(order["amount"]) / 100 if order["currency"] == "vnd" else float(order["amount"])),
+        currency=order["currency"],
+        ip_address=client_ip,
+        billing_country="VN",
+    )
+    fraud_result = fraud_detector.assess_transaction(fraud_check)
+
+    # Nếu phát hiện fraud (score cao hoặc rule cứng), chặn giao dịch
+    if fraud_result.is_fraud:
+        log_security_event(
+            event_type="fraud_blocked",
+            severity="critical",
+            user_id=order_id,
+            ip_address=request.client.host,
+            details={
+                "fraud_score": fraud_result.score,
+                "rules": fraud_result.triggered_rules,
             },
         )
+        log_audit_trail(
+            action="payment_blocked",
+            actor_user_id=str(order_id),
+            target=f"order:{order_id}",
+            details={
+                "fraud_score": fraud_result.score,
+                "rules": fraud_result.triggered_rules,
+            },
+        )
+        return JSONResponse(
+            status_code=403,
+            content={"success": False, "error": f"⚠️ Transaction blocked: {fraud_result.message} (Score: {fraud_result.score:.2f})"},
+        )
+
+    # Nếu score ở mức trung bình (0.4 <= score < 0.75), yêu cầu OTP
+    if 0.4 <= fraud_result.score < 0.75:
+        # Nếu chưa có OTP, trả về yêu cầu OTP (và gửi OTP)
+        if not otp:
+            user = db.query(User).filter(User.id == int(auth_user_id)).first() if auth_user_id else None
+            email = _decrypt_email(user) if user else None
+            otp_sent = False
+            if email:
+                otp_service.send_otp(email, float(order["amount"]), order["currency"], order_id)
+                otp_sent = True
+            return JSONResponse(
+                status_code=200,
+                content={
+                    "success": False,
+                    "require_otp": True,
+                    "message": "Giao dịch cần xác thực OTP. OTP đã được gửi đến email của bạn." if otp_sent else "Giao dịch cần xác thực OTP. Không thể gửi OTP.",
+                },
+            )
+        # Nếu đã có OTP, xác thực OTP
+        user = db.query(User).filter(User.id == int(auth_user_id)).first() if auth_user_id else None
+        email = _decrypt_email(user) if user else None
+        if not email:
+            return JSONResponse(
+                status_code=404,
+                content={"success": False, "error": "Không tìm thấy thông tin người dùng"},
+            )
+        is_valid = otp_service.verify_otp(email, order_id, otp)
+        if not is_valid:
+            return JSONResponse(
+                status_code=400,
+                content={"success": False, "error": "Mã OTP không đúng hoặc đã hết hạn."},
+            )
+        # Nếu OTP hợp lệ, tiếp tục thanh toán
     
     auth_user_id = _get_authenticated_user_id(request)
     if not auth_user_id:
@@ -723,136 +792,15 @@ async def create_payment(
 
     if user_id is not None and int(user_id) != int(auth_user_id):
         log_security_event(
-            event_type="idor_blocked",
-            severity="warning",
-            user_id=str(auth_user_id),
-            ip_address=request.client.host if request.client else None,
-            details={"endpoint": "create_payment", "submitted_user_id": int(user_id)},
-        )
-        return templates.TemplateResponse(
-            "error.html",
+            # Nếu score thấp (< 0.4), cho phép thanh toán luôn
+            # ...existing code...
             {
                 "request": request,
-                "error": "❌ Forbidden: user mismatch. Please logout/login and clear stale localStorage/cookies.",
-            },
-            status_code=403,
-        )
-    
-    # Tìm user trong database để lấy email
-    user = db.query(User).filter(User.id == int(auth_user_id)).first()
-    if not user:
-        return templates.TemplateResponse(
-            "error.html",
-            {
-                "request": request,
-                "error": "❌ Không tìm thấy thông tin người dùng!",
-            },
-        )
-    
-    # Giải mã email
-    email = _decrypt_email(user)
-    if not email:
-        return templates.TemplateResponse(
-            "error.html",
-            {
-                "request": request,
-                "error": "❌ Lỗi xử lý thông tin người dùng!",
-            },
-        )
-    
-    # Kiểm tra OTP đã được verify chưa (sẽ trả về True nếu đã verify trong 10 phút qua)
-    # Không cần verify lại OTP nếu đã verify trước đó
-    is_valid = otp_service.verify_otp(email, order_id, otp)
-    if not is_valid:
-        return templates.TemplateResponse(
-            "error.html",
-            {
-                "request": request,
-                "error": "❌ Mã OTP không đúng hoặc đã hết hạn!",
+                "order_id": order_id,
+                "message": "Vui lòng nhập mã OTP để xác thực thanh toán!",
             },
         )
 
-    print(f"✅ OTP verified successfully for {email}")
-
-    order = next((o for o in MOCK_ORDERS if o["id"] == order_id), None)
-    if not order:
-        order = TEMP_CART_ORDER.get(order_id)
-    if not order:
-        return templates.TemplateResponse(
-            "error.html", {"request": request, "error": "Order not found"}
-        )
-
-    # Ensure fraud_result exists even if fraud detector raises
-    fraud_result = None
-
-    # =========================
-    # 🛡️ FRAUD DETECTION CHECK
-    # =========================
-    client_ip = request.client.host if request.client else None
-
-    # Authenticated user is already required above; load user for fraud attribution.
-    user_db = None
-    try:
-        user_db = db.query(db_models.User).filter(db_models.User.id == int(auth_user_id)).first()
-    except Exception as e:
-        print(f"⚠️ Error querying user by id: {e}")
-
-    try:
-        # Lấy thông tin client
-        client_ip = request.client.host if request.client else None
-
-        # Lấy user_id để sử dụng trong fraud detection
-        fraud_user_id = str(user_db.id) if user_db else str(auth_user_id)
-
-        # Tạo transaction input để kiểm tra
-        fraud_check = TransactionInput(
-            user_id=fraud_user_id,
-            amount=(
-                float(order["amount"]) / 100
-                if order["currency"] == "vnd"
-                else float(order["amount"])
-            ),  # Convert VND về đơn vị chuẩn
-            currency=order["currency"],
-            ip_address=client_ip,
-            billing_country="VN",  # Có thể lấy từ form hoặc user profile
-        )
-
-        # Kiểm tra fraud
-        fraud_result = fraud_detector.assess_transaction(fraud_check)
-
-        # Nếu phát hiện fraud, chặn giao dịch
-        if fraud_result.is_fraud:
-            log_security_event(
-                event_type="fraud_blocked",
-                severity="critical",
-                user_id=order_id,
-                ip_address=request.client.host,
-                details={
-                    "fraud_score": fraud_result.score,
-                    "rules": fraud_result.triggered_rules,
-                },
-            )
-            log_audit_trail(
-                action="payment_blocked",
-                actor_user_id=str(order_id),
-                target=f"order:{order_id}",
-                details={
-                    "fraud_score": fraud_result.score,
-                    "rules": fraud_result.triggered_rules,
-                },
-            )
-            return templates.TemplateResponse(
-                "error.html",
-                {
-                    "request": request,
-                    "error": f"⚠️ Transaction blocked: {fraud_result.message} (Score: {fraud_result.score:.2f})",
-                },
-            )
-
-    except Exception as e:
-        # Log lỗi nhưng vẫn cho phép giao dịch tiếp tục (fail-open mode)
-        print(f"⚠️ Fraud detection error: {e}")
-        traceback.print_exc()
 
     # =========================
     # RACE CONDITION PREVENTION - DB LOCKING
@@ -886,14 +834,41 @@ async def create_payment(
                 status_code=503,
             )
         
+        # Generate idempotency key (order_id + nonce for uniqueness)
+        idempotency_key = f"order_{order_id}_nonce_{nonce}"
         intent = stripe.PaymentIntent.create(
             amount=order["amount"],
             currency=order["currency"],
             description=order["description"],
             payment_method_data={"type": "card", "card": {"token": payment_token}},
             confirm=True,
+            capture_method="manual",
             return_url="http://127.0.0.1:8000/success_payment",
+            metadata={"order_id": order_id},
+            idempotency_key=idempotency_key
         )
+
+        # Sau khi intent được tạo, chạy fraud check
+        fraud_result = fraud_detector.assess_transaction(fraud_check)
+        if fraud_result.is_fraud:
+            # Nếu nghi ngờ, cancel intent
+            try:
+                stripe.PaymentIntent.cancel(intent.id)
+            except Exception as e:
+                logger.error(f"Failed to cancel PaymentIntent {intent.id}: {e}")
+            return templates.TemplateResponse(
+                "error.html",
+                {
+                    "request": request,
+                    "error": f"\u26a0\ufe0f Transaction blocked: {fraud_result.message} (Score: {fraud_result.score:.2f})",
+                },
+            )
+        else:
+            # Nếu an toàn, capture intent và cập nhật intent status
+            try:
+                intent = stripe.PaymentIntent.capture(intent.id)
+            except Exception as e:
+                logger.error(f"Failed to capture PaymentIntent {intent.id}: {e}")
 
         if intent.status == "succeeded":
             card_summary = _stripe_card_summary_from_intent(intent) or {}

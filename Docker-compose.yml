@@ -16,6 +16,16 @@ services:
       timeout: 5s
       retries: 5
 
+
+  redis:
+    image: redis:7-alpine
+    container_name: nt219_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+
   backend:
     build: .
     container_name: nt219_backend
@@ -27,6 +37,8 @@ services:
     environment:
       # Override database host to use Docker service name
       - database_hostname=db
+      - redis_hostname=redis
+      - redis_port=6379
       - PYTHONUNBUFFERED=1
     volumes:
       - ./backend:/app/backend
@@ -36,6 +48,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_started
     restart: unless-stopped
 
   nginx:
@@ -53,3 +67,4 @@ services:
 
 volumes:
   postgres_data:
+  redis_data:

@@ -722,54 +722,51 @@ h2 i {
     <input type="hidden" id="device-fingerprint-input" name="device_fingerprint">
     <input type="hidden" id="user-id-input" name="user_id">
 
-    <!-- OTP Status Messages -->
-    <div id="otp-message" class="otp-message" style="display: none;"></div>
-
-    <!-- OTP Input (hiển thị ngay) -->
-    <div class="form-group otp-input-group" id="otp-group">
-      <label for="otp-input">
-        <i class="fa-solid fa-key"></i> Mã OTP (6 chữ số)
-      </label>
-      <small style="color: #6b7280; font-size: 13px; margin-bottom: 10px; display: block;">
-        <i class="fa-solid fa-info-circle"></i> Mã OTP đã được tự động gửi đến email đã đăng ký của bạn
-      </small>
-      <div class="otp-input-container">
-        <input type="text" id="otp-input" name="otp" class="otp-input" placeholder="000000" maxlength="6">
-        <button type="button" id="verify-otp-btn" class="verify-otp-btn">
-          <i class="fa-solid fa-check"></i> Xác thực OTP
-        </button>
-        <button type="button" id="resend-otp-btn" class="resend-btn">
-          <i class="fa-solid fa-redo"></i> Gửi lại
-        </button>
-      </div>
-      <div class="otp-timer">
-        <i class="fa-solid fa-clock"></i>
-        OTP có hiệu lực trong: <span id="countdown" class="countdown">Đang gửi...</span>
+    <!-- OTP Status Messages & Input: Ẩn mặc định, chỉ hiển thị khi backend trả về yêu cầu OTP -->
+    <div id="otp-section" style="display: none;">
+      <div id="otp-message" class="otp-message" style="display: none;"></div>
+      <div class="form-group otp-input-group" id="otp-group">
+        <label for="otp-input">
+          <i class="fa-solid fa-key"></i> Mã OTP (6 chữ số)
+        </label>
+        <small style="color: #6b7280; font-size: 13px; margin-bottom: 10px; display: block;">
+          <i class="fa-solid fa-info-circle"></i> Mã OTP đã được tự động gửi đến email đã đăng ký của bạn
+        </small>
+        <div class="otp-input-container">
+          <input type="text" id="otp-input" name="otp" class="otp-input" placeholder="000000" maxlength="6">
+          <button type="button" id="verify-otp-btn" class="verify-otp-btn">
+            <i class="fa-solid fa-check"></i> Xác thực OTP
+          </button>
+          <button type="button" id="resend-otp-btn" class="resend-btn">
+            <i class="fa-solid fa-redo"></i> Gửi lại
+          </button>
+        </div>
+        <div class="otp-timer">
+          <i class="fa-solid fa-clock"></i>
+          OTP có hiệu lực trong: <span id="countdown" class="countdown">Đang gửi...</span>
+        </div>
       </div>
     </div>
 
-    <!-- 4. Card section: chỉ hiển thị sau khi OTP đã xác thực -->
-    <div id="card-section" style="display: none;">
+    <!-- Card section: chỉ có 1, sẽ được ẩn/hiện bằng JS -->
+    <div id="card-section" style="display: block;">
       <div class="form-group">
         <label for="card-holder-name">
           <i class="fa-solid fa-user"></i> Tên chủ thẻ
         </label>
         <input type="text" id="card-holder-name" class="email-input" placeholder="VD: NGUYEN VAN A" required>
       </div>
-
       <div class="form-group">
         <label>
           <i class="fa-solid fa-credit-card"></i> Thông tin thẻ (Được bảo mật bởi PSP)
         </label>
         <div id="card-element"></div>
       </div>
-
       <div id="payment-errors" class="payment-errors" style="display: none;"></div>
       <div id="loading-message" class="loading-message" style="display: none;">Đang xử lý giao dịch... Vui lòng đợi.</div>
-
       <!-- Nút Thanh Toán -->
-      <button id="submit-button" class="pay-button" type="submit" disabled>
-        <i class="fa-solid fa-lock"></i> Vui lòng xác thực OTP trước khi thanh toán
+      <button id="submit-button" class="pay-button" type="submit">
+        <i class="fa-solid fa-shield-check"></i> Thanh Toán {{ "{:,.0f}".format(order.amount | int) }} {{ order.currency }}
       </button>
     </div>
   </form>
@@ -794,32 +791,33 @@ function withCsrf(headers) {
   return headers;
 }
 
-const cardElement = elements.create('card', {
-  style: {
-    base: {
-      fontSize: '16px',
-      color: '#1e293b',
-      fontFamily: '"Inter", sans-serif',
-      '::placeholder': {
-        color: '#94a3b8',
-      }
-    },
-    invalid: {
-      color: '#ef4444',
-      iconColor: '#ef4444'
-    },
-    complete: {
-      color: '#10b981',
-      iconColor: '#10b981'
-    }
-  }
-});
-
+let cardElement = null;
 let cardMounted = false;
 function mountCardElement() {
   try {
+    if (!cardElement) {
+      cardElement = elements.create('card', {
+        style: {
+          base: {
+            fontSize: '16px',
+            color: '#1e293b',
+            fontFamily: '"Inter", sans-serif',
+            '::placeholder': {
+              color: '#94a3b8',
+            }
+          },
+          invalid: {
+            color: '#ef4444',
+            iconColor: '#ef4444'
+          },
+          complete: {
+            color: '#10b981',
+            iconColor: '#10b981'
+          }
+        }
+      });
+    }
     if (!cardMounted) {
-      console.log('Mounting card element...');
       cardElement.mount('#card-element');
       cardMounted = true;
       console.log('✅ Card element mounted successfully');
@@ -830,6 +828,11 @@ function mountCardElement() {
     console.error('Error mounting card element:', err);
   }
 }
+
+// Mount card element ngay khi trang load
+window.addEventListener('DOMContentLoaded', function() {
+  mountCardElement();
+});
 
 // ========= DOM & state =========
 const form = document.getElementById('payment-form');
@@ -1123,57 +1126,26 @@ async function verifyOTP() {
       try {
         console.log('✅ OTP verification successful!');
         otpVerified = true;
-        
         // Lưu trạng thái verified vào sessionStorage
         const otpVerifiedKey = `otp_verified_${orderId}`;
         sessionStorage.setItem(otpVerifiedKey, 'true');
         console.log('Session storage set:', otpVerifiedKey);
-        
         if (otpCountdown) clearInterval(otpCountdown);
         countdownSpan.textContent = 'ĐÃ XÁC THỰC';
         countdownSpan.className = 'countdown';
-        console.log('Countdown updated');
-
-        showOTPMessage('✅ OTP chính xác. Bạn có thể nhập thông tin thẻ và thanh toán.', 'success');
-        console.log('Success message shown');
-
-        // Khoá OTP để tránh đổi lại
+        showOTPMessage('✅ OTP chính xác. Đang xử lý thanh toán...', 'success');
         otpInput.readOnly = true;
-
         resendOtpBtn.style.display = 'none';
         verifyOtpBtn.style.display = 'none';
-        console.log('OTP buttons hidden');
-
-        // Hiện phần thẻ
-        console.log('Showing card section...');
-        cardSection.style.display = 'block';
-        console.log('Card section displayed');
-
-        // Card entry chỉ cho 2 phút
-        scheduleAutoLogout(120);
-        
-        mountCardElement();
-        console.log('Card element mounted');
-        
-        // Scroll mượt đến phần nhập thẻ
+        document.getElementById('otp-section').style.display = 'none';
+        // Tự động submit form thanh toán ngay sau khi xác thực OTP thành công
         setTimeout(() => {
-          cardSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          console.log('Scrolled to card section');
-        }, 300);
-        
-        if (cardHolderName) {
-          setTimeout(() => {
-            cardHolderName.focus();
-            console.log('Card holder name focused');
-          }, 800);
-        }
-
-        // Enable nút thanh toán
-        submitButton.disabled = false;
-        submitButton.innerHTML = '<i class="fa-solid fa-shield-check"></i> Thanh Toán ' +
-          orderAmount.toLocaleString('vi-VN') + ' VND';
-        console.log('✅ Submit button enabled');
-        console.log('✅ ALL UI UPDATES COMPLETED SUCCESSFULLY');
+          submitButton.disabled = false;
+          submitButton.innerHTML = '<i class="fa-solid fa-shield-check"></i> Đang thanh toán...';
+          form.requestSubmit();
+        }, 500);
+        scheduleAutoLogout(120);
+        console.log('✅ Auto-submitting payment form after OTP verified');
       } catch (uiError) {
         console.error('❌ Error updating UI after OTP verify:', uiError);
         showOTPMessage('⚠️ OTP đã xác thực nhưng có lỗi hiển thị. Vui lòng reload trang.', 'warning');
@@ -1241,7 +1213,8 @@ window.addEventListener('DOMContentLoaded', function() {
 form.addEventListener('submit', async function (e) {
   e.preventDefault();
 
-  if (!otpVerified) {
+  // Nếu đang ở bước OTP, chỉ xác thực OTP, không gửi lại thanh toán
+  if (document.getElementById('otp-section').style.display === 'block' && !otpVerified) {
     showOTPMessage('⚠️ Bạn cần xác thực OTP thành công trước khi thanh toán.', 'error');
     return;
   }
@@ -1291,12 +1264,41 @@ form.addEventListener('submit', async function (e) {
       body: formData
     });
 
+    // Nếu backend trả về JSON yêu cầu OTP hoặc lỗi
+    const contentType = response.headers.get('content-type') || '';
+    if (contentType.includes('application/json')) {
+      const data = await response.json();
+      console.log('Backend JSON response:', data);
+      if (data.require_otp) {
+        // Ẩn form thẻ, hiện form OTP
+        document.getElementById('card-section').style.display = 'none';
+        document.getElementById('otp-section').style.display = 'block';
+        showOTPMessage('Giao dịch cần xác thực OTP. Vui lòng kiểm tra email!', 'warning');
+        sendOTP();
+        loadingDiv.style.display = 'none';
+        submitButton.disabled = false;
+        submitButton.classList.remove('processing');
+        return;
+      } else if (data.success === false) {
+        // Hiển thị lỗi rõ ràng
+        showOTPMessage(data.error || 'Giao dịch thất bại.', 'error');
+        errorDiv.textContent = data.error || 'Giao dịch thất bại.';
+        errorDiv.style.display = 'block';
+        loadingDiv.style.display = 'none';
+        submitButton.disabled = false;
+        submitButton.classList.remove('processing');
+        return;
+      }
+    }
+
+    // Nếu backend trả về HTML (thành công hoặc lỗi), render luôn
     if (response.ok) {
       const html = await response.text();
       document.documentElement.innerHTML = html;
     } else {
       const errorHtml = await response.text();
       console.error("API Error:", errorHtml);
+      showOTPMessage('Giao dịch thất bại: Lỗi từ API Gateway', 'error');
       errorDiv.textContent = 'Giao dịch thất bại: Lỗi từ API Gateway';
       errorDiv.style.display = 'block';
       loadingDiv.style.display = 'none';
@@ -1305,6 +1307,7 @@ form.addEventListener('submit', async function (e) {
     }
   } catch (err) {
     console.error(err);
+    showOTPMessage('Lỗi kết nối mạng hoặc máy chủ.', 'error');
     errorDiv.textContent = 'Lỗi kết nối mạng hoặc máy chủ.';
     errorDiv.style.display = 'block';
     loadingDiv.style.display = 'none';

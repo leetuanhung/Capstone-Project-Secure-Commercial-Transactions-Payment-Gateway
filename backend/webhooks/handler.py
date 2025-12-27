@@ -48,7 +48,21 @@ def handle_unhandle_event(event_type):
     logger.info("Webhook event ignored", extra={"event_type": event_type})
     
 def dispatch_event(event):
-    
+    # Deduplicate event.id using Redis
+    try:
+        from backend.middleware.rate_limiter import redis_client, USE_REDIS
+        event_id = event.get('id')
+        if USE_REDIS and event_id:
+            redis_key = f"stripe_event:{event_id}"
+            # setnx: only set if not exists, expire in 7 days
+            is_new = redis_client.set(redis_key, "1", ex=604800, nx=True)
+            if not is_new:
+                logger.info(f"Duplicate Stripe event {event_id} ignored (already processed)")
+                return {"status": "duplicate", "event_id": event_id}
+    except Exception as e:
+        error_logger.error(f"Redis dedupe error: {str(e)}", exc_info=True)
+        # Continue processing to avoid missing event
+
     #dieu phoi su kien da duoc xac thuc den ham xu li
     try:
         event_type = event.get('type')
@@ -56,13 +70,13 @@ def dispatch_event(event):
     except Exception as e:
         error_logger.error(f"Error parsing event: {str(e)}", exc_info=True)
         return {"status": "error", "message": str(e)}
-        
+
     if event_type == 'payment_intent.succeeded':
         handle_payment_success(event_data)
-        
+
     elif event_type == 'payment_method.attached':
         handle_payment_method_attached(event_data)
     else:
         handle_unhandle_event(event_type)
-        
+
     return {"status": "success"}

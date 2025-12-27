@@ -113,11 +113,19 @@ class FraudDetector:
 
             # Tính các feature cơ bản
             amounts = [o.total_price for o in user_orders if o.total_price is not None]
-            now = datetime.datetime.utcnow()
+            # Always use offset-aware UTC datetime for comparison
+            now = datetime.datetime.now(datetime.timezone.utc)
 
             def count_since(days: int):
                 cutoff = now - datetime.timedelta(days=days)
-                return sum(1 for o in user_orders if o.created_at and o.created_at >= cutoff)
+                def to_aware(dt):
+                    if dt is None:
+                        return None
+                    if dt.tzinfo is None:
+                        # Assume naive datetimes are UTC
+                        return dt.replace(tzinfo=datetime.timezone.utc)
+                    return dt
+                return sum(1 for o in user_orders if o.created_at and to_aware(o.created_at) >= cutoff)
 
             avg_amount = float(sum(amounts) / len(amounts)) if amounts else 0.0
             max_amount = float(max(amounts)) if amounts else 0.0
@@ -126,7 +134,10 @@ class FraudDetector:
             cnt_30d = count_since(30)
             last_order_seconds = None
             if user_orders and user_orders[0].created_at:
-                last_order_seconds = (now - user_orders[0].created_at).total_seconds()
+                created_at = user_orders[0].created_at
+                if created_at.tzinfo is None:
+                    created_at = created_at.replace(tzinfo=datetime.timezone.utc)
+                last_order_seconds = (now - created_at).total_seconds()
             last_order_seconds = float(last_order_seconds) if last_order_seconds is not None else 1e9
 
             # Chuẩn bị feature vector (sắp xếp theo cùng một thứ tự mà model training dùng)

@@ -126,31 +126,28 @@ class OTPService:
         </html>
         """
         
-        try:
-            # Tạo message giống test.py
-            msg = EmailMessage()
-            msg["Subject"] = subject
-            msg["From"] = GMAIL_USER
-            msg["To"] = email
-            msg.set_content(html_body, subtype='html')
+        def send_email_background():
+            try:
+                msg = EmailMessage()
+                msg["Subject"] = subject
+                msg["From"] = GMAIL_USER
+                msg["To"] = email
+                msg.set_content(html_body, subtype='html')
+                context = ssl.create_default_context()
+                with smtplib.SMTP_SSL('smtp.gmail.com', 465, context=context) as server:
+                    server.login(GMAIL_USER, GMAIL_APP_PASSWORD)
+                    server.send_message(msg)
+                print(f"✅ OTP sent to {email}: {otp}")
+            except Exception as e:
+                print(f"❌ Failed to send OTP: {e}")
+                traceback.print_exc()
 
-            # Kết nối SMTP Gmail giống test.py
-            context = ssl.create_default_context()
-            with smtplib.SMTP_SSL('smtp.gmail.com', 465, context=context) as server:
-                server.login(GMAIL_USER, GMAIL_APP_PASSWORD)
-                server.send_message(msg)
-            
-            print(f"✅ OTP sent to {email}: {otp}")
-            
-            # Lưu OTP vào Redis hoặc memory
-            self._store_otp(email, otp, order_id)
-            
-            return otp
-            
-        except Exception as e:
-            print(f"❌ Failed to send OTP: {e}")
-            traceback.print_exc()
-            return None
+        # Lưu OTP vào Redis hoặc memory ngay lập tức (không chờ gửi email xong)
+        self._store_otp(email, otp, order_id)
+        # Gửi email ở background thread
+        import threading
+        threading.Thread(target=send_email_background, daemon=True).start()
+        return otp
     
     def _store_otp(self, email: str, otp: str, order_id: str):
         """
