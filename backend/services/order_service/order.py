@@ -33,7 +33,7 @@ MOCK_ORDERS = [
     },
     {
         "id": "ORD-" + secrets.token_hex(4).upper(), 
-        "amount": 1590000, 
+        "amount": 159000000, 
         "currency": "VND", 
         "description": "Premium Security Package (1 Year)", 
         "status": "PENDING",
