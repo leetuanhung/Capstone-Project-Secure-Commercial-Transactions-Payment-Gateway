@@ -508,21 +508,12 @@ async def request_otp(
     if not email:
         return {"success": False, "message": "Lỗi xử lý thông tin người dùng"}
 
-    # Gửi OTP
-    otp = otp_service.send_otp(email, float(order_amount), order_currency, order_id)
-
-    if otp:
-        return {
-            "success": True,
-            "message": f"Mã OTP đã được gửi đến email đã đăng ký. Vui lòng kiểm tra hộp thư.",
-            "email_masked": email[:3] + "***@" + email.split("@")[1] if "@" in email else "***",
-            "expires_in": 300,  # seconds
-        }
-    else:
-        return {
-            "success": False,
-            "message": "Không thể gửi OTP. Vui lòng thử lại sau.",
-        }
+    # Không gửi OTP tại đây - OTP sẽ được gửi sau fraud detection trong create_payment
+    return {
+        "success": True,
+        "message": f"Thông tin xác thực hợp lệ. Vui lòng tiếp tục thanh toán.",
+        "email_masked": email[:3] + "***@" + email.split("@")[1] if "@" in email else "***",
+    }
 
 
 @router.post("/verify_otp")

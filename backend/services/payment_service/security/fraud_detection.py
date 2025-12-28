@@ -17,8 +17,11 @@ from backend.models import models as db_models
 # Bạn có thể tải danh sách này từ CSDL hoặc tệp cấu hình
 HIGH_RISK_COUNTRIES: Set[str] = {"KP", "IR", "SY"} 
 
-# Ngưỡng giá trị giao dịch cao
-HIGH_VALUE_THRESHOLD: float = 1000000.00
+# Ngưỡng giá trị giao dịch cao (DEMO: giảm từ 1M xuống 500K VND)
+HIGH_VALUE_THRESHOLD: float = 500000.00  # ~500K VND (~$20 USD)
+
+# Ngưỡng giao dịch đáng ngờ - trigger OTP (DEMO: thêm mới)
+SUSPICIOUS_VALUE_THRESHOLD: float = 200000.00  # ~200K VND (~$8 USD)
 
 # Ngưỡng điểm số
 FRAUD_SCORE_THRESHOLD: float = 0.75 # 85%
@@ -186,9 +189,13 @@ class FraudDetector:
         """
         triggered = []
 
-        # Quy tắc 1: Giao dịch giá trị cực cao
+        # Quy tắc 1: Giao dịch giá trị cực cao (> 500K VND)
         if transaction.amount > HIGH_VALUE_THRESHOLD:
             triggered.append("HIGH_VALUE_TRANSACTION")
+            
+        # Quy tắc 1.5: Giao dịch đáng ngờ - yêu cầu OTP (200K - 500K VND)
+        elif transaction.amount > SUSPICIOUS_VALUE_THRESHOLD:
+            triggered.append("SUSPICIOUS_VALUE")
 
         # Quy tắc 2: Quốc gia rủi ro cao
         if transaction.billing_country and transaction.billing_country.upper() in HIGH_RISK_COUNTRIES:
@@ -197,6 +204,10 @@ class FraudDetector:
         # Quy tắc 3: Thiếu thông tin IP (ví dụ)
         if not transaction.ip_address:
             triggered.append("MISSING_IP_ADDRESS")
+            
+        # Quy tắc 4: DEMO - Số tiền tròn đáng ngờ (100K, 200K, 300K...)
+        if transaction.amount % 100000 == 0 and transaction.amount >= 100000:
+            triggered.append("ROUND_AMOUNT")
 
         # Bạn có thể thêm nhiều quy tắc khác ở đây
         # ...
@@ -227,9 +238,15 @@ class FraudDetector:
             message = "Blocked due to high-risk country."
             
         elif "HIGH_VALUE_TRANSACTION" in triggered_rules:
-            # Quy tắc mềm: Tăng điểm số
-            final_score = max(final_score, 0.75) # Tăng điểm lên ít nhất 0.75
-            message = "Flagged for high value. Requires review."
+            # Quy tắc cứng: Chặn giao dịch quá cao (> 500K)
+            is_fraudulent = True
+            final_score = 0.95
+            message = "Blocked due to extremely high transaction value (> 500K VND)."
+            
+        elif "SUSPICIOUS_VALUE" in triggered_rules or "ROUND_AMOUNT" in triggered_rules:
+            # Quy tắc mềm: Yêu cầu OTP (200K-500K hoặc số tròn)
+            final_score = 0.55  # Nằm trong khoảng 0.4-0.75 để trigger OTP
+            message = "Suspicious transaction pattern detected. OTP required."
 
         # Kiểm tra ngưỡng cuối cùng
         if not is_fraudulent and final_score >= FRAUD_SCORE_THRESHOLD:
