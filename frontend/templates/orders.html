@@ -440,6 +440,60 @@
             font-weight: 600;
             color: var(--gray);
         }
+        
+        /* Quantity Selector */
+        .quantity-selector {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            margin-bottom: 16px;
+            background: var(--light);
+            padding: 8px;
+            border-radius: 12px;
+        }
+        
+        .qty-btn {
+            width: 36px;
+            height: 36px;
+            border: none;
+            border-radius: 8px;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: var(--white);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s;
+            font-size: 14px;
+        }
+        
+        .qty-btn:hover {
+            transform: scale(1.1);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+        
+        .qty-btn:active {
+            transform: scale(0.95);
+        }
+        
+        .qty-input {
+            width: 60px;
+            height: 36px;
+            border: 2px solid var(--primary);
+            border-radius: 8px;
+            text-align: center;
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--dark);
+            background: var(--white);
+        }
+        
+        .qty-input:focus {
+            outline: none;
+            border-color: var(--secondary);
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
 
         .product-actions {
             display: flex;
@@ -1012,9 +1066,20 @@
                         {{ "{:,.0f}".format(order.amount | int) }}
                         <span class="currency">{{ order.currency }}</span>
                     </div>
+                    
+                    <!-- Quantity Selector -->
+                    <div class="quantity-selector">
+                        <button class="qty-btn qty-minus" onclick="updateQuantity('{{ order.id }}', -1)">
+                            <i class="fas fa-minus"></i>
+                        </button>
+                        <input type="number" id="qty-{{ order.id }}" class="qty-input" value="1" min="1" max="99" readonly>
+                        <button class="qty-btn qty-plus" onclick="updateQuantity('{{ order.id }}', 1)">
+                            <i class="fas fa-plus"></i>
+                        </button>
+                    </div>
 
                     <div class="product-actions">
-                        <a href="/order_service/add_to_cart?order_id={{ order.id }}" class="btn btn-secondary" title="Thêm vào giỏ">
+                        <a href="#" onclick="addToCartWithQty('{{ order.id }}'); return false;" class="btn btn-secondary" title="Thêm vào giỏ">
                             <i class="fas fa-cart-plus"></i>
                             <span>Thêm vào giỏ</span>
                         </a>
@@ -1106,6 +1171,37 @@
     </div>
 
     <script>
+        // ==========================================
+        // QUANTITY MANAGEMENT
+        // ==========================================
+        function updateQuantity(orderId, delta) {
+            const input = document.getElementById('qty-' + orderId);
+            let currentQty = parseInt(input.value) || 1;
+            let newQty = currentQty + delta;
+            
+            // Enforce min/max
+            if (newQty < 1) newQty = 1;
+            if (newQty > 99) newQty = 99;
+            
+            input.value = newQty;
+            
+            // Add animation feedback
+            input.style.transform = 'scale(1.2)';
+            setTimeout(() => {
+                input.style.transform = 'scale(1)';
+            }, 200);
+        }
+        
+        function addToCartWithQty(orderId) {
+            const qty = document.getElementById('qty-' + orderId).value;
+            
+            // Show loading
+            document.querySelector('.loading').style.display = 'block';
+            
+            // Redirect with quantity parameter
+            window.location.href = `/order_service/add_to_cart?order_id=${orderId}&quantity=${qty}`;
+        }
+        
         // Add to cart with loading animation
         document.querySelectorAll('.btn-secondary').forEach(btn => {
             btn.addEventListener('click', function(e) {

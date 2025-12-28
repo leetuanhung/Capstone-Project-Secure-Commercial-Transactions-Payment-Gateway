@@ -92,16 +92,31 @@ async def list_orders(request: Request):
 
 
 @router.get("/add_to_cart", tags=["Cart"])
-async def add_to_cart(order_id: str):
+async def add_to_cart(order_id: str, quantity: int = 1):
     
-    logger.info(f"Item added to card: {order_id}")
+    logger.info(f"Item added to cart: {order_id}, quantity: {quantity}")
+    
+    # Validate quantity
+    if quantity < 1:
+        quantity = 1
+    if quantity > 99:
+        quantity = 99
     
     order = next((o for o in MOCK_ORDERS if o["id"] == order_id), None)
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
-    if any(item["id"] == order_id for item in CART):
-        return RedirectResponse(url="/order_service/orders?message=Sản phẩm đã có trong giỏ", status_code=302)
-    CART.append(order)
+    
+    # Check if item already in cart
+    existing_item = next((item for item in CART if item["id"] == order_id), None)
+    if existing_item:
+        # Update quantity if already exists
+        existing_item["quantity"] = existing_item.get("quantity", 1) + quantity
+        return RedirectResponse(url="/order_service/orders?message=Đã cập nhật số lượng", status_code=302)
+    
+    # Add new item with quantity
+    cart_item = order.copy()
+    cart_item["quantity"] = quantity
+    CART.append(cart_item)
     return RedirectResponse(url="/order_service/orders", status_code=303)
 
 @router.get("/cart", response_class=HTMLResponse, tags=["Cart"])
